@@ -52,7 +52,7 @@ public class AnalyzeReportCommandHandler(
     /// </summary>
     private const string ErrorMessage =
         "<b>Отчёт некорректен (оценка: {0}/10). 🚫</b>\n\n" +
-        "Пожалуйста, исправьте отчёт на основе следующих рекомендаций:\n\n" +
+        "Пожалуйста, исправьте отчёт на основе рекомендаций.\n\n" +
         "<b>Рекомендации:</b>\n" +
         "<blockquote>{1}</blockquote>";
 
@@ -86,15 +86,14 @@ public class AnalyzeReportCommandHandler(
         "<b>Анализатор отчётов временно недоступен. 🛠️</b>\n\n" +
         "Пожалуйста, повторите попытку через несколько минут. Мы уже работаем над решением проблемы.";
 
-    /// <summary>
-    /// Сообщение об ошибке, если попытка отправить отчёт сделана вне допустимого времени.
-    /// Информирует пользователя о временных рамках для отправки утренних и вечерних отчётов.
-    /// </summary>
+    // Сообщение, информирующее о временных ограничениях для отправки отчётов.
+    // Уведомляет пользователя, что в текущее время отправка отчётов невозможна.
+    // Также указывает, что пользователь получит уведомление, когда наступит время для отправки отчёта.
     private const string ReportTimeRestrictionMessage =
         "<b>Сейчас не время для отправки отчёта. ⏰</b>\n\n" +
         "Утренние отчёты принимаются с <b>9:00 до 10:00</b> по МСК, " +
         "а вечерние — с <b>18:00 до 19:00</b> по МСК. " +
-        "Пожалуйста, вернитесь в указанное время, чтобы отправить отчёт.";
+        "Я отправлю вам уведомление, когда наступит время для отправки отчёта. 🛎";
 
     /// <summary>
     /// Сообщение для проверяющего о новом отчёте пользователя.
@@ -105,6 +104,16 @@ public class AnalyzeReportCommandHandler(
         "👇 <b>Текст отчёта:</b>\n" +
         "<blockquote>{1}</blockquote>\n\n" +
         "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
+    
+    /// <summary>
+    /// Шаблон сообщения о просрочке утреннего отчёта.
+    /// </summary>
+    private const string MorningOverdueMessage = "⚠️ Вы просрочили утренний отчёт на {0}. Постарайтесь не задерживать отчёты в будущем!";
+
+    /// <summary>
+    /// Шаблон сообщения о просрочке вечернего отчёта.
+    /// </summary>
+    private const string EveningOverdueMessage = "⚠️ Вы просрочили вечерний отчёт на {0}. Постарайтесь не задерживать отчёты в будущем!";
 
     /// <summary>
     /// Параметры параллельного выполнения.
@@ -137,7 +146,7 @@ public class AnalyzeReportCommandHandler(
         var now = dateTimeProvider.Now;
 
         // Если текущее время не подходит для отправки утреннего или вечернего отчёта
-        if (!now.IsMorningReportTime() && !now.IsEveningReportTime())
+        if (!now.IsWorkingPeriod())
         {
             // Отправляем сообщение о временных ограничениях
             await client.SendMessage(
@@ -147,7 +156,6 @@ public class AnalyzeReportCommandHandler(
                 cancellationToken: cancellationToken
             );
 
-            // Завершаем выполнение метода
             return;
         }
 
@@ -157,13 +165,13 @@ public class AnalyzeReportCommandHandler(
             .Where(r => r.Date.Date == now.Date)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Если текущее время подходит для утреннего отчёта и утренний отчёт уже был отправлен
-        if (now.IsMorningReportTime() && report is { MorningReport: not null })
+        // Если вечерний отчёт уже сдан - ничего не делаем
+        if (report?.EveningReport != null)
         {
-            // Отправляем сообщение о том, что утренний отчёт уже был отправлен
+            // Отправляем сообщение о том, что вечерний отчёт уже был отправлен
             await client.SendMessage(
                 chatId: request.ChatId,
-                text: MorningReportAlreadySentMessage,
+                text: EveningReportAlreadySentMessage,
                 parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken
             );
@@ -172,13 +180,13 @@ public class AnalyzeReportCommandHandler(
             return;
         }
 
-        // Если текущее время подходит для вечернего отчёта и вечерний отчёт уже был отправлен
-        if (now.IsEveningReportTime() && report is { EveningReport: not null })
+        // Если утренний отчёт уже сдан и еще не время для сдачи вечернего отчёта
+        if (report?.MorningReport != null && !now.IsEveningPeriod())
         {
-            // Отправляем сообщение о том, что вечерний отчёт уже был отправлен
+            // Отправляем сообщение о том, что утренний отчёт уже был отправлен
             await client.SendMessage(
                 chatId: request.ChatId,
-                text: EveningReportAlreadySentMessage,
+                text: MorningReportAlreadySentMessage,
                 parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken
             );
@@ -236,48 +244,104 @@ public class AnalyzeReportCommandHandler(
             return;
         }
 
-        // Получаем текущую дату и время
+// Получаем текущее время после анализа данных.
         var timeAfterAnalyze = dateTimeProvider.Now;
 
-        // Если отчёт за текущую дату отсутствует, создаём новый
+// Если отчёт за текущую дату отсутствует, создаём новый.
         if (report == null)
         {
-            // Создаём новый отчёт с текущей датой и ID пользователя
+            // Создаём новый отчёт с текущей датой и ID пользователя.
             report = new Report
             {
+                // Указываем ID пользователя, которому принадлежит отчёт.
                 UserId = request.User!.Id,
-                Date = timeAfterAnalyze
+
+                // Устанавливаем текущую дату для отчёта.
+                Date = timeAfterAnalyze,
+
+                // Заполняем данные утреннего отчёта.
+                MorningReport = new UserReport
+                {
+                    // Данные отчёта, переданные в запросе.
+                    Data = request.Report!,
+
+                    // Проверяем, просрочен ли утренний отчёт.
+                    Overdue = timeAfterAnalyze.MorningReportOverdue()
+                }
             };
 
-            // Добавляем отчёт в базу данных
+            // Добавляем отчёт в базу данных.
             await unitOfWork.AddAsync(report, cancellationToken);
         }
-
-        // Проверяем текущее время для определения типа отчёта (утренний или вечерний)
-        if (now.IsMorningReportTime())
+        else
         {
-            // Сохраняем отчёт как утренний
-            report.MorningReport = request.Report;
+            // Если отчёт за текущую дату уже существует, обновляем вечерний отчёт.
+            report.EveningReport = new UserReport
+            {
+                // Данные отчёта, переданные в запросе.
+                Data = request.Report!,
+
+                // Проверяем, просрочен ли вечерний отчёт.
+                Overdue = timeAfterAnalyze.EveningReportOverdue()
+            };
         }
-        else if (now.IsEveningReportTime())
+
+        // Сохраняем изменения в базе данных.
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Определяем сообщение об успешном сохранении в зависимости от времени.
+        if (report.EveningReport == null)
         {
-            // Сохраняем отчёт как вечерний
-            report.EveningReport = request.Report;
+            // Отправляем сообщение об успешном сохранении утреннего отчёта.
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: MorningSuccessMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: CancellationToken.None
+            );
+
+            // Если утренний отчёт был просрочен, отправляем дополнительное уведомление.
+            if (report.MorningReport.Overdue.HasValue)
+            {
+                // Формируем сообщение о просрочке.
+                var overdueMessage = string.Format(MorningOverdueMessage,
+                    report.MorningReport.Overdue.Value.ToString("hh\\:mm"));
+
+                // Отправляем сообщение о просрочке.
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: overdueMessage,
+                    parseMode: ParseMode.Html,
+                    cancellationToken: CancellationToken.None
+                );
+            }
         }
+        else
+        {
+            // Отправляем сообщение об успешном сохранении вечернего отчёта.
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: EveningSuccessMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: CancellationToken.None
+            );
 
-        // Сохраняем изменения в базе данных
-        // await unitOfWork.SaveChangesAsync(cancellationToken);
+            // Если вечерний отчёт был просрочен, отправляем дополнительное уведомление.
+            if (report.EveningReport.Overdue.HasValue)
+            {
+                // Формируем сообщение о просрочке.
+                var overdueMessage = string.Format(EveningOverdueMessage,
+                    report.EveningReport.Overdue.Value.ToString("hh\\:mm"));
 
-        // Определяем сообщение об успешном сохранении в зависимости от времени
-        var successMessage = now.IsMorningReportTime() ? MorningSuccessMessage : EveningSuccessMessage;
-
-        // Отправляем сообщение об успешном сохранении отчёта
-        await client.SendMessage(
-            chatId: request.ChatId,
-            text: successMessage,
-            parseMode: ParseMode.Html,
-            cancellationToken: CancellationToken.None
-        );
+                // Отправляем сообщение о просрочке.
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: overdueMessage,
+                    parseMode: ParseMode.Html,
+                    cancellationToken: CancellationToken.None
+                );
+            }
+        }
 
         // Получаем список ID проверяющих
         var examiners = await unitOfWork
@@ -294,7 +358,8 @@ public class AnalyzeReportCommandHandler(
                 // Отправляем сообщение проверяющему.
                 await client.SendMessage(
                     chatId: userId,
-                    text: string.Format(ReportSubmissionMessage, request.User?.FullName ?? string.Empty, request.Report),
+                    text: string.Format(ReportSubmissionMessage, request.User?.FullName ?? string.Empty,
+                        request.Report),
                     parseMode: ParseMode.Html,
                     replyMarkup: ExamKeyboard.ExamReportKeyboard(report.Id),
                     cancellationToken: ct

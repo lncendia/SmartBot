@@ -23,12 +23,24 @@ public class ReportData
     /// <summary>
     /// Утренний отчет.
     /// </summary>
-    public string? MorningReport { get; set; }
+    public string? MorningReport { get; init; }
+    
+    /// <summary>
+    /// Время, на которое утренний отчёт был просрочен.
+    /// Если отчёт сдан вовремя, значение равно null.
+    /// </summary>
+    public TimeSpan? MorningReportOverdue { get; init; }
 
     /// <summary>
     /// Вечерний отчет.
     /// </summary>
-    public string? EveningReport { get; set; }
+    public string? EveningReport { get; init; }
+    
+    /// <summary>
+    /// Время, на которое вечерний отчёт был просрочен.
+    /// Если отчёт сдан вовремя, значение равно null.
+    /// </summary>
+    public TimeSpan? EveningReportOverdue { get; init; }
 
     /// <summary>
     /// Дата создания отчета.
@@ -38,5 +50,5 @@ public class ReportData
     /// <summary>
     /// Комментарий, сгенерированный ботом.
     /// </summary>
-    public string? Comment { get; set; }
+    public string? Comment { get; init; }
 }

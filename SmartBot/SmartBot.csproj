@@ -7,12 +7,26 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.2">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
         <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\SmartBot.Infrastructure\SmartBot.Infrastructure.csproj" />
       <ProjectReference Include="..\SmartBot.Services\SmartBot.Services.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="logs\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Update="google.credentials.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
 </Project>

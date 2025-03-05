@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SmartBot.Infrastructure.Contexts;
 
@@ -18,7 +19,7 @@ public static class DatabaseInitializer
         // Получаем экземпляр контекста базы данных (ApplicationDbContext) из провайдера сервисов.
         var context = scopeServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        // Инициализируем базу данных
-        await context.Database.EnsureCreatedAsync();
+        // Выполняем миграции
+        await context.Database.MigrateAsync();
     }
 }

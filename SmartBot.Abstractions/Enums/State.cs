@@ -43,5 +43,10 @@ public enum State
     /// <summary>
     /// Ожидает ввода идентификатора пользователя для удаления.
     /// </summary>
-    AwaitingUserIdForRemoval
+    AwaitingUserIdForRemoval,
+    
+    /// <summary>
+    /// Заблокирован.
+    /// </summary>
+    Blocked
 }

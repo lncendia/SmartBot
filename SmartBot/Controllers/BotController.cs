@@ -7,8 +7,9 @@ namespace SmartBot.Controllers;
 /// <summary>
 /// Контроллер для обработки обновлений от Telegram
 /// </summary>
+[ApiController]
 [Route("[controller]")]
-public class BotController(IUpdateHandler updateService) : ControllerBase
+public class BotController(IUpdateHandler updateHandler) : ControllerBase
 {
     /// <summary>
     /// Обрабатывает обновление
@@ -20,30 +21,9 @@ public class BotController(IUpdateHandler updateService) : ControllerBase
     public async Task<IActionResult> Post([FromBody] Update update, CancellationToken ct)
     {
         // Обрабатываем обновление
-        await updateService.HandleAsync(update, ct);
+        await updateHandler.HandleAsync(update, ct);
 
         // Возвращаем успешный результат
         return Ok();
     }
 }
-
-// [Route("[controller]")]
-// public class BotController(IServiceProvider provider) : ControllerBase
-// {
-//     [HttpPost]
-//     public IActionResult Post([FromBody] Update update, CancellationToken ct)
-//     {
-//         var x = provider.CreateScope();
-//         Do(x, update);
-//         return Ok();
-//     }
-
-//     void Do(IServiceScope scope, Update update)
-//     {
-//         using (scope)
-//         {
-//             var updateService = scope.ServiceProvider.GetRequiredService<IUpdateHandler>();
-//             updateService.HandleAsync(update, CancellationToken.None);
-//         }
-//     }
-// }

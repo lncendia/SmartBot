@@ -23,12 +23,12 @@ public class Report
     /// <summary>
     /// Утренний отчет.
     /// </summary>
-    public string? MorningReport { get; set; }
+    public required UserReport MorningReport { get; set; }
 
     /// <summary>
     /// Вечерний отчет.
     /// </summary>
-    public string? EveningReport { get; set; }
+    public UserReport? EveningReport { get; set; }
 
     /// <summary>
     /// Дата создания отчета.

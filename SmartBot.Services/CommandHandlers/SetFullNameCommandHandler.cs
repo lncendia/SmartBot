@@ -83,8 +83,26 @@ public class SetFullNameCommandHandler(ITelegramBotClient client, IUnitOfWork un
         // Проверка, что длина ФИО не превышает 150 символов
         if (fullName.Length > 150) return false;
 
-        // Проверка, что ФИО состоит из трёх частей (Фамилия, Имя, Отчество)
+        // Разделение ФИО на части (Фамилия, Имя, Отчество)
         var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length == 3 && parts.All(part => !string.IsNullOrWhiteSpace(part));
+
+        // Проверка, что ФИО состоит из трёх частей
+        if (parts.Length != 3) return false;
+
+        // Проверка каждой части ФИО
+        foreach (var part in parts)
+        {
+            // Проверка, что часть не пустая
+            if (string.IsNullOrWhiteSpace(part)) return false;
+
+            // Проверка, что все символы в части являются буквами
+            if (!part.All(char.IsLetter)) return false;
+
+            // Проверка, что часть начинается с заглавной буквы
+            if (!char.IsUpper(part[0])) return false;
+        }
+
+        // Если все проверки пройдены, возвращаем true
+        return true;
     }
 }

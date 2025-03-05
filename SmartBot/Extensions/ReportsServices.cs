@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
+using SmartBot.Abstractions.Interfaces.DataExporter;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
 using SmartBot.HostedServices;
+using SmartBot.Infrastructure.Services.DataExporter;
 using SmartBot.Infrastructure.Services.ReportAnalyzer;
 
 namespace SmartBot.Extensions;
@@ -30,7 +32,32 @@ public static class ReportsServices
             Model = configuration.GetRequiredValue<string>("Openrouter:Model"),
         };
 
-        // Добавляем конфигурацию для анализатора
+        // Получаем путь к файлу с учетными данными Google
+        var googleCredentialsPath = configuration.GetRequiredValue<string>("Exporting:GoogleCredentialsPath");
+
+        // Считываем содержимое файла с учетными данными Google
+        var googleCredentials = File.ReadAllText(googleCredentialsPath);
+
+        // Создаем конфигурацию для Google Sheets
+        var googleSheetsConfiguration = new GoogleSheetsConfiguration
+        {
+            // Устанавливаем имя приложения
+            ApplicationName = configuration.GetRequiredValue<string>("Exporting:ApplicationName"),
+
+            // Устанавливаем идентификатор листа
+            SheetId = configuration.GetRequiredValue<int>("Exporting:SheetId"),
+
+            // Устанавливаем идентификатор таблицы
+            SpreadsheetId = configuration.GetRequiredValue<string>("Exporting:SpreadsheetId"),
+
+            // Устанавливаем учетные данные Google
+            CredentialsJson = googleCredentials,
+        };
+
+        // Регистрируем конфигурацию Google Sheets как синглтон
+        services.AddSingleton(googleSheetsConfiguration);
+
+        // Добавляем конфигурацию для анализатора как синглтон
         services.AddSingleton(analyzerConfiguration);
 
         // Добавляем HTTP-клиент для анализатора отчетов
@@ -62,7 +89,13 @@ public static class ReportsServices
             return new ResilientAnalyzer(reportAnalyzer, logger);
         });
 
+        // Добавляем сервис экспортирования данных в Google Sheets
+        services.AddScoped<IDataExporter, GoogleSheetsExporter>();
+
         // Добавляем фоновый сервис экспорта отчётов
         services.AddHostedService<ExportingHostedService>();
+        
+        // Добавляем фоновый сервис отчистки старых отчётов
+        services.AddHostedService<ClearingHostedService>();
     }
 }

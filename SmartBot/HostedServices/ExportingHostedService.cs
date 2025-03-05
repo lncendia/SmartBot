@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Interfaces.DataExporter;
@@ -82,7 +83,7 @@ public class ExportingHostedService(
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
             // Получаем экземпляр сервиса для экспорта данных
-            // var exporter = scope.ServiceProvider.GetRequiredService<IDataExporter>();
+            var exporter = scope.ServiceProvider.GetRequiredService<IDataExporter>();
 
             // Получаем данные о последнем экспорте из базы данных
             var exporterData = await unitOfWork.Query<Exporter>().SingleOrDefaultAsync();
@@ -120,16 +121,22 @@ public class ExportingHostedService(
                     .FirstOrDefaultAsync();
 
                 // Если дата последнего экспорта не найдена, используем текущую дату
-                lastExportedDate = lastDate == default ? dateTimeProvider.Now.Date : lastDate;
+                lastExportedDate = lastDate == default ? dateTimeProvider.Now.Date.AddDays(-1) : lastDate;
             }
 
             // Получаем список отчётов для экспорта
             var reports = await unitOfWork.Query<User>()
 
+                // Фильтруем пользователей, не являющихся проверяющими
+                .Where(u => !u.IsExaminer)
+
+                // Фильтруем пользователей, не являющихся заблокированными
+                .Where(u => u.State != State.Blocked)
+
                 // Выполняем LEFT JOIN между таблицами User и Report
                 .GroupJoin(
-                    // Запрашиваем таблицу отчётов
-                    unitOfWork.Query<Report>(),
+                    // Фильтруем отчёты по дате (только те, которые новее последнего экспорта)
+                    unitOfWork.Query<Report>().Where(r => r.Date > lastExportedDate),
 
                     // Ключ для соединения: ID пользователя
                     user => user.Id,
@@ -159,10 +166,20 @@ public class ExportingHostedService(
                         Date = report != null ? report.Date.Date : dateTimeProvider.Now.Date,
 
                         // Утренний отчёт
-                        MorningReport = report != null ? report.MorningReport : null,
+                        MorningReport = report != null ? report.MorningReport.Data : null,
+
+                        // Просрочка утреннего отчёта
+                        MorningReportOverdue = report != null ? report.MorningReport.Overdue : null,
 
                         // Вечерний отчёт
-                        EveningReport = report != null ? report.EveningReport : null,
+                        EveningReport = report != null && report.EveningReport != null
+                            ? report.EveningReport.Data
+                            : null,
+
+                        // Просрочка вечернего отчёта
+                        EveningReportOverdue = report != null && report.EveningReport != null
+                            ? report.EveningReport.Overdue
+                            : null,
 
                         // Комментарий к отчёту
                         Comment = report != null ? report.Comment : null,
@@ -172,20 +189,24 @@ public class ExportingHostedService(
                     }
                 )
 
-                // Фильтруем отчёты по дате (только те, которые новее последнего экспорта)
-                .Where(r => r.Date >= lastExportedDate)
-
                 // Сортируем отчёты по дате в порядке убывания
-                .OrderByDescending(r => r.Date)
+                .OrderBy(r => r.Date)
 
                 // Получаем список отчётов
                 .ToListAsync();
 
             // Экспортируем отчёты с помощью сервиса экспорта
-            // await exporter.ExportReportsAsync(reports);
+            await exporter.ExportReportsAsync(reports);
 
-            // Обновляем ID последнего экспортированного отчёта
-            exporterData.LastExportedReportId = reports.FirstOrDefault(r => r.Id.HasValue)?.Id;
+            // Получаем идентификатор последнего существующего экспортированного отчёта
+            var lastId = reports.FirstOrDefault(r => r.Id.HasValue)?.Id;
+
+            // Если существующий (а не пустой) отчёт найден
+            if (lastId.HasValue)
+            {
+                // Обновляем ID последнего экспортированного отчёта
+                exporterData.LastExportedReportId = lastId.Value;
+            }
 
             // Обновляем дату последнего экспорта
             exporterData.LastExportingDate = dateTimeProvider.Now;
@@ -196,7 +217,7 @@ public class ExportingHostedService(
         catch (Exception ex)
         {
             // Логируем ошибку, если что-то пошло не так
-            logger.LogError(ex, "Ошибка при экспорте отчётов.");
+            logger.LogError(ex, "Error when exporting reports.");
         }
     }
 

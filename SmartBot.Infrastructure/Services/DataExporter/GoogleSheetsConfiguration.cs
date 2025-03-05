@@ -11,12 +11,17 @@ public class GoogleSheetsConfiguration
     public required string ApplicationName { get; init; }
     
     /// <summary>
-    /// Диапазон для записи данных в таблицу.
+    /// Идентификатор листа для записи данных в таблицу.
     /// </summary>
-    public required string SheetRange { get; init; }
+    public required int SheetId { get; init; }
 
     /// <summary>
     /// Данные для авторизации в Google.
     /// </summary>
     public required string CredentialsJson { get; init; }
+    
+    /// <summary>
+    /// Идентификатор таблицы.
+    /// </summary>
+    public required string SpreadsheetId { get; init; }
 } 

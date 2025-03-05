@@ -40,6 +40,9 @@ public static class TelegramServices
             // Регистрируем типизированный клиент ITelegramBotClient
             .AddTypedClient<ITelegramBotClient>(httpClient => new TelegramBotClient(token, httpClient));
 
+        // Настройте ASP.NET Json десериализацию для типов Telegram.Bot
+        services.ConfigureTelegramBotMvc();
+        
         // Регистрируем обработчик обновлений (IUpdateHandler) как Scoped-сервис
         services.AddScoped<IUpdateHandler, UpdateHandler>();
 

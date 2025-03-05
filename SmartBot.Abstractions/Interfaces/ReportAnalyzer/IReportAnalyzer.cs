@@ -8,8 +8,8 @@ public interface IReportAnalyzer
     /// <summary>
     /// Анализирует отчет
     /// </summary>  
-    /// <param name="report">Отчет</param>
-    /// <param name="cancelationToken">Токен отмены операции</param>
-    /// <returns>Результат анализа отчета</returns>
-    Task<ReportAnalyzeResult> AnalyzeAsync(string report, CancellationToken cancelationToken = default);
+    /// <param name="report">Отчет для анализа.</param>
+    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
+    /// <returns>Результат анализа отчета.</returns>
+    Task<ReportAnalyzeResult> AnalyzeAsync(string report, CancellationToken cancellationToken = default);
 }

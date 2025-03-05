@@ -146,12 +146,10 @@ public class ResilientAnalyzer : IReportAnalyzer
             .Build();
     }
 
+    /// <inheritdoc/>
     /// <summary>
     /// Анализирует отчет с использованием отказоустойчивого пайплайна.
     /// </summary>
-    /// <param name="report">Отчет для анализа.</param>
-    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
-    /// <returns>Результат анализа отчета.</returns>
     public async Task<ReportAnalyzeResult> AnalyzeAsync(string report, CancellationToken cancellationToken = default)
     {
         // Выполняем запрос через пайплайн с отказоустойчивостью

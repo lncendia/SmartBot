@@ -74,11 +74,10 @@ public class ReportAnalyzer(AnalyzerConfiguration configuration, IHttpClientFact
         }
     };
 
+    /// <inheritdoc/>
     /// <summary>
     /// Асинхронный метод для анализа отчёта с использованием API OpenRouter.
     /// </summary>
-    /// <param name="report">Текст отчёта для анализа.</param>
-    /// <returns>Результат анализа, содержащий оценку и рекомендации.</returns>
     public async Task<ReportAnalyzeResult> AnalyzeAsync(string report, CancellationToken token)
     {
         // Создание модели запроса для отправки в API

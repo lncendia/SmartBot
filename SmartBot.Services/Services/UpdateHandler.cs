@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -57,7 +59,7 @@ public class UpdateHandler : IUpdateHandler
         ISender sender,
         IMessageCommandFactory messageCommandFactory,
         ICallbackQueryCommandFactory callbackQueryCommandFactory,
-        IUnitOfWork unitOfWork, 
+        IUnitOfWork unitOfWork,
         IUserSynchronizationService synchronizationService)
     {
         _logger = logger;
@@ -104,7 +106,7 @@ public class UpdateHandler : IUpdateHandler
     /// <param name="update">Обновление, которое нужно обработать.</param>
     /// <param name="cancellationToken">Токен отмены.</param>
     /// <returns>Завершенная задача.</returns>
-    // ReSharper disable once UnusedParameter.Local
+    [SuppressMessage("ReSharper", "UnusedParameter.Local")]
     private static Task UnknownUpdateHandlerAsync(Update update, CancellationToken cancellationToken)
     {
         // Пропускаем обработку неизвестных обновлений
@@ -124,6 +126,9 @@ public class UpdateHandler : IUpdateHandler
 
         // Если пользователь не найден, прерываем обработку
         if (user == null) return;
+        
+        // Если пользователь заблокирован - не продолжаем
+        if (user.State == State.Blocked) return;
 
         // Создаем команду на основе callback-запроса
         var command = _callbackQueryCommandFactory.GetCommand(user, callbackQuery);
@@ -164,6 +169,9 @@ public class UpdateHandler : IUpdateHandler
             // Если отправитель сообщения известен, получаем пользователя из базы данных
             var user = await _unitOfWork.Query<User>()
                 .FirstOrDefaultAsync(u => u.Id == message.From.Id, cancellationToken: cancellationToken);
+
+            // Если пользователь заблокирован - не продолжаем
+            if (user?.State == State.Blocked) return;
 
             // Создаем команду на основе сообщения
             var command = _messageCommandFactory.GetCommand(user, message);

@@ -21,13 +21,22 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
         // Устанавливаем первичный ключ
         builder.HasKey(r => r.Id);
 
-        // Устанавливаем ограничения для свойства Content
+        // Устанавливаем ограничения для свойства MorningReport
         builder.Property(r => r.MorningReport)
-            .HasMaxLength(5000); // Максимальная длина 1000 символов
+            .HasMaxLength(5000); // Максимальная длина 5000 символов
 
-        // Устанавливаем ограничения для свойства Content
+        // Устанавливаем ограничения для свойства EveningReport
         builder.Property(r => r.EveningReport)
-            .HasMaxLength(5000); // Максимальная длина 1000 символов
+            .HasMaxLength(5000); // Максимальная длина 5000 символов
+        
+        // Устанавливаем ограничения для свойства Comment
+        builder.Property(r => r.Comment)
+            .HasMaxLength(1500); // Максимальная длина 1500 символовэ
+
+        // Настройка владеемых типов (owned types) для MorningReport и EveningReport.
+        // Это позволяет хранить эти объекты как часть сущности Report в базе данных.
+        builder.OwnsOne(b => b.MorningReport); // Настройка владеемого типа для утреннего отчёта.
+        builder.OwnsOne(b => b.EveningReport); // Настройка владеемого типа для вечернего отчёта.
 
         // Настраиваем связь many-to-one с сущностью User
         builder.HasOne(r => r.User) // У отчёта может быть только один пользователь
