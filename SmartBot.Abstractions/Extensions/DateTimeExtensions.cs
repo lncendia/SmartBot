@@ -70,9 +70,36 @@ public static class DateTimeExtensions
     /// <returns>true, если дата является выходным днем; в противном случае — false.</returns>
     public static bool IsWeekend(this DateTime dateTime)
     {
-        return false; //todo: for testing
-
         // Суббота или воскресенье
         return dateTime.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+    }
+    
+    /// <summary>
+    /// Форматирует TimeSpan в строку в формате "Xч Yм Zс", исключая нулевые компоненты.
+    /// </summary>
+    /// <param name="timeSpan">Временной интервал для форматирования.</param>
+    /// <returns>Отформатированная строка.</returns>
+    public static string FormatTimeSpan(this TimeSpan? timeSpan)
+    {
+        // Если интервал не задан - возвращаем пустую строку
+        if (!timeSpan.HasValue) return string.Empty;
+
+        // Список частей строки
+        var parts = new List<string>();
+
+        // Добавляем часы, если они есть
+        if (timeSpan.Value.Hours > 0) parts.Add($"{timeSpan.Value.Hours}ч");
+
+        // Добавляем минуты, если они есть
+        if (timeSpan.Value.Minutes > 0) parts.Add($"{timeSpan.Value.Minutes}м");
+
+        // Добавляем секунды, если они есть
+        if (timeSpan.Value.Seconds > 0) parts.Add($"{timeSpan.Value.Seconds}с");
+
+        // Если все компоненты нулевые, возвращаем "0с"
+        if (parts.Count == 0) return "0с";
+
+        // Соединяем части в одну строку с пробелами
+        return string.Join(" ", parts);
     }
 }

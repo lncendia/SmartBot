@@ -3,6 +3,7 @@ using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
 using Microsoft.Extensions.Logging;
+using SmartBot.Abstractions.Extensions;
 using SmartBot.Abstractions.Interfaces.DataExporter;
 
 namespace SmartBot.Infrastructure.Services.DataExporter;
@@ -91,13 +92,13 @@ public class GoogleSheetsExporter : IDataExporter
             report.MorningReport ?? string.Empty,
 
             // Просрочка утреннего отчёта
-            FormatTimeSpan(report.MorningReportOverdue),
+            report.MorningReportOverdue.FormatTimeSpan(),
 
             // Вечерний отчёт
             report.EveningReport ?? string.Empty,
 
             // Просрочка утреннего отчёта
-            FormatTimeSpan(report.EveningReportOverdue),
+            report.EveningReportOverdue.FormatTimeSpan(),
 
             // Дата отчёта
             report.Date.ToString("dd.MM.yyyy"),
@@ -192,7 +193,7 @@ public class GoogleSheetsExporter : IDataExporter
             // Создаем список запросов для настройки ширины колонок
             var columnWidthRequests = new List<Request>
             {
-                // Запрос для установки ширины колонки 0 (Name) в 250 пикселей
+                // Запрос для установки ширины колонки 0 (Name) и 1 (Position) в 250 пикселей
                 new()
                 {
                     UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
@@ -202,31 +203,11 @@ public class GoogleSheetsExporter : IDataExporter
                             SheetId = _configuration.SheetId,
                             Dimension = "COLUMNS",
                             StartIndex = 0,
-                            EndIndex = 1
-                        },
-                        Properties = new DimensionProperties
-                        {
-                            PixelSize = 250
-                        },
-                        Fields = "pixelSize"
-                    }
-                },
-
-                // Запрос для установки ширины колонки 1 (Position) в 150 пикселей
-                new()
-                {
-                    UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
-                    {
-                        Range = new DimensionRange
-                        {
-                            SheetId = _configuration.SheetId,
-                            Dimension = "COLUMNS",
-                            StartIndex = 1,
                             EndIndex = 2
                         },
                         Properties = new DimensionProperties
                         {
-                            PixelSize = 150
+                            PixelSize = 250
                         },
                         Fields = "pixelSize"
                     }
@@ -366,7 +347,7 @@ public class GoogleSheetsExporter : IDataExporter
                         StartRowIndex = 0,
                         EndRowIndex = 1,
                         StartColumnIndex = 0,
-                        EndColumnIndex = 6
+                        EndColumnIndex = 8
                     },
 
                     // Устанавливаем параметры форматирования
@@ -454,31 +435,171 @@ public class GoogleSheetsExporter : IDataExporter
             }
         };
 
-        // Добавляем запрос форматирования данных в список
+        // Добавляем запрос форматирования данных в список запросов.
         requests.Add(dataFormatRequest);
 
-        // Создаем запрос для установки высоты строк данных
+        // Создаем запрос для установки переноса текста в колонке с индексом 2.
+        var wrapTextRequestColumn2 = new Request
+        {
+            // Указываем параметры для обновления ячеек.
+            RepeatCell = new RepeatCellRequest
+            {
+                // Указываем диапазон колонок (2, 4 и 7).
+                Range = new GridRange
+                {
+                    // ID листа, на котором будут применяться изменения.
+                    SheetId = _configuration.SheetId,
+
+                    // Начальная колонка (индекс 2).
+                    StartColumnIndex = 2,
+
+                    // Конечная колонка (индекс 3, не включая).
+                    EndColumnIndex = 3,
+
+                    // Начальная строка (индекс 1, пропускаем заголовок).
+                    StartRowIndex = 1,
+
+                    // Конечная строка (последняя строка с данными).
+                    EndRowIndex = lastRow + reportsCount
+                },
+
+                // Устанавливаем свойства ячеек.
+                Cell = new CellData
+                {
+                    // Формат ячейки, который будет применён.
+                    UserEnteredFormat = new CellFormat
+                    {
+                        // Включаем перенос текста в ячейках.
+                        WrapStrategy = "WRAP"
+                    }
+                },
+
+                // Указываем, что нужно обновить только свойство WrapStrategy.
+                Fields = "userEnteredFormat.wrapStrategy"
+            }
+        };
+
+        // Добавляем запрос форматирования данных в список запросов.
+        requests.Add(wrapTextRequestColumn2);
+
+        // Создаем запрос для установки переноса текста в колонке с индексом 4.
+        var wrapTextRequestColumn4 = new Request
+        {
+            // Указываем параметры для обновления ячеек.
+            RepeatCell = new RepeatCellRequest
+            {
+                // Указываем диапазон колонок (4).
+                Range = new GridRange
+                {
+                    // ID листа, на котором будут применяться изменения.
+                    SheetId = _configuration.SheetId,
+
+                    // Начальная колонка (индекс 4).
+                    StartColumnIndex = 4,
+
+                    // Конечная колонка (индекс 5, не включая).
+                    EndColumnIndex = 5,
+
+                    // Начальная строка (индекс 1, пропускаем заголовок).
+                    StartRowIndex = 1,
+
+                    // Конечная строка (последняя строка с данными).
+                    EndRowIndex = lastRow + reportsCount
+                },
+
+                // Устанавливаем свойства ячеек.
+                Cell = new CellData
+                {
+                    // Формат ячейки, который будет применён.
+                    UserEnteredFormat = new CellFormat
+                    {
+                        // Включаем перенос текста в ячейках.
+                        WrapStrategy = "WRAP"
+                    }
+                },
+
+                // Указываем, что нужно обновить только свойство WrapStrategy.
+                Fields = "userEnteredFormat.wrapStrategy"
+            }
+        };
+
+        // Добавляем запрос форматирования данных в список запросов.
+        requests.Add(wrapTextRequestColumn4);
+
+        // Создаем запрос для установки переноса текста в колонке с индексом 7.
+        var wrapTextRequestColumn7 = new Request
+        {
+            // Указываем параметры для обновления ячеек.
+            RepeatCell = new RepeatCellRequest
+            {
+                // Указываем диапазон колонок (7).
+                Range = new GridRange
+                {
+                    // ID листа, на котором будут применяться изменения.
+                    SheetId = _configuration.SheetId,
+
+                    // Начальная колонка (индекс 7).
+                    StartColumnIndex = 7,
+
+                    // Конечная колонка (индекс 8, не включая).
+                    EndColumnIndex = 8,
+
+                    // Начальная строка (индекс 1, пропускаем заголовок).
+                    StartRowIndex = 1,
+
+                    // Конечная строка (последняя строка с данными).
+                    EndRowIndex = lastRow + reportsCount
+                },
+
+                // Устанавливаем свойства ячеек.
+                Cell = new CellData
+                {
+                    // Формат ячейки, который будет применён.
+                    UserEnteredFormat = new CellFormat
+                    {
+                        // Включаем перенос текста в ячейках.
+                        WrapStrategy = "WRAP"
+                    }
+                },
+
+                // Указываем, что нужно обновить только свойство WrapStrategy.
+                Fields = "userEnteredFormat.wrapStrategy"
+            }
+        };
+
+        // Добавляем запрос форматирования данных в список запросов.
+        requests.Add(wrapTextRequestColumn7);
+
+        // Создаем запрос для установки высоты строк данных.
         var dataRowHeightRequest = new Request
         {
-            // Указываем параметры для изменения высоты строк
+            // Указываем параметры для изменения высоты строк.
             UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
             {
-                // Указываем диапазон строк (строки с данными)
+                // Указываем диапазон строк (строки с данными).
                 Range = new DimensionRange
                 {
+                    // ID листа, на котором будут применяться изменения.
                     SheetId = _configuration.SheetId,
+
+                    // Указываем, что работаем со строками.
                     Dimension = "ROWS",
+
+                    // Начальный индекс строки (первая строка с данными).
                     StartIndex = lastRow,
+
+                    // Конечный индекс строки (последняя строка с данными).
                     EndIndex = lastRow + reportsCount
                 },
 
-                // Устанавливаем высоту строки в 80 пикселей
+                // Устанавливаем свойства для изменения высоты строк.
                 Properties = new DimensionProperties
                 {
+                    // Устанавливаем высоту строки в 80 пикселей.
                     PixelSize = 80
                 },
 
-                // Указываем, что нужно обновить только высоту строки
+                // Указываем, что нужно обновить только высоту строки.
                 Fields = "pixelSize"
             }
         };
@@ -496,34 +617,5 @@ public class GoogleSheetsExporter : IDataExporter
         // Выполняем запрос на форматирование
         await _sheetsService.Spreadsheets.BatchUpdate(batchUpdateRequest, _configuration.SpreadsheetId)
             .ExecuteAsync(token);
-    }
-
-    /// <summary>
-    /// Форматирует TimeSpan в строку в формате "Xч Yм Zс", исключая нулевые компоненты.
-    /// </summary>
-    /// <param name="timeSpan">Временной интервал для форматирования.</param>
-    /// <returns>Отформатированная строка.</returns>
-    public static string FormatTimeSpan(TimeSpan? timeSpan)
-    {
-        // Если интервал не задан - возвращаем пустую строку
-        if (!timeSpan.HasValue) return string.Empty;
-
-        // Список частей строки
-        var parts = new List<string>();
-
-        // Добавляем часы, если они есть
-        if (timeSpan.Value.Hours > 0) parts.Add($"{timeSpan.Value.Hours}ч");
-
-        // Добавляем минуты, если они есть
-        if (timeSpan.Value.Minutes > 0) parts.Add($"{timeSpan.Value.Minutes}м");
-
-        // Добавляем секунды, если они есть
-        if (timeSpan.Value.Seconds > 0) parts.Add($"{timeSpan.Value.Seconds}с");
-
-        // Если все компоненты нулевые, возвращаем "0с"
-        if (parts.Count == 0) return "0с";
-
-        // Соединяем части в одну строку с пробелами
-        return string.Join(" ", parts);
     }
 }
