@@ -1,4 +1,4 @@
-﻿using SmartBot.Abstractions.Commands;
+﻿using MediatR;
 using Telegram.Bot.Types;
 using User = SmartBot.Abstractions.Models.User;
 
@@ -15,5 +15,5 @@ public interface ICallbackQueryCommandFactory
     /// <param name="user">Пользователь</param>
     /// <param name="query">Callback-запрос</param>
     /// <returns>Команда или null, если команда не найдена</returns>
-    TelegramCommand? GetCommand(User user, CallbackQuery query);
+    IRequest? GetCommand(User user, CallbackQuery query);
 }

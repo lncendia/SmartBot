@@ -70,7 +70,7 @@ public class ClearingHostedService(
         try
         {
             // Если сегодня выходной день, очистка не выполняется
-            if (dateTimeProvider.Now.IsWeekend()) return;
+            if (dateTimeProvider.Now.IsPreviousDayWeekend()) return;
 
             // Создаем область (scope) для работы с зависимостями (DI)
             using var scope = serviceProvider.CreateScope();

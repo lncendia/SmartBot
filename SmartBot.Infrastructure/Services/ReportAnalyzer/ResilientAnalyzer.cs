@@ -28,6 +28,11 @@ public class ResilientAnalyzer : IReportAnalyzer
     private readonly IReportAnalyzer _analyzer;
 
     /// <summary>
+    /// Логгер.
+    /// </summary>
+    private readonly ILogger<ResilientAnalyzer> _logger;
+
+    /// <summary>
     /// Конструктор класса.
     /// </summary>
     /// <param name="innerAnalyzer">Реализация интерфейса анализатора отчетов.</param>
@@ -36,6 +41,9 @@ public class ResilientAnalyzer : IReportAnalyzer
     {
         // Устанавливаем базовый анализатор
         _analyzer = innerAnalyzer;
+
+        // Устанавливаем логгер
+        _logger = logger;
 
         // Настройка пайплайна отказоустойчивости
         _pipeline = new ResiliencePipelineBuilder()
@@ -153,12 +161,25 @@ public class ResilientAnalyzer : IReportAnalyzer
     public async Task<ReportAnalyzeResult> AnalyzeAsync(string report, CancellationToken cancellationToken = default)
     {
         // Выполняем запрос через пайплайн с отказоустойчивостью
-        var result = await _pipeline.ExecuteAsync(
-            async ct => await _analyzer.AnalyzeAsync(report, ct),
-            cancellationToken
-        );
+        var result = await _pipeline.ExecuteAsync(Pipeline, cancellationToken);
 
         // Возвращаем результат анализа
         return result;
+
+        // Функция для выполнения
+        async ValueTask<ReportAnalyzeResult> Pipeline(CancellationToken token)
+        {
+            try
+            {
+                // Выполняем анализ отчёта
+                return await _analyzer.AnalyzeAsync(report, token);
+            }
+            catch (Exception e)
+            {
+                // Логгируем исключение
+                _logger.LogError(e, "Failed to analyze the report.");
+                throw;
+            }
+        }
     }
 }

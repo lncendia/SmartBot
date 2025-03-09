@@ -3,6 +3,7 @@ using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Services.Keyboards.ExaminerKeyboard;
 using Telegram.Bot.Types;
+using IRequest = MediatR.IRequest;
 using User = SmartBot.Abstractions.Models.User;
 
 namespace SmartBot.Services.Services;
@@ -18,7 +19,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
     /// <param name="user">Пользователь, отправивший callback-запрос.</param>
     /// <param name="query">Callback-запрос.</param>
     /// <returns>Команда для обработки callback-запроса или null, если команда не найдена.</returns>
-    public TelegramCommand? GetCommand(User user, CallbackQuery query)
+    public IRequest? GetCommand(User user, CallbackQuery query)
     {
         // Проверяем, есть ли данные в callback-запросе
         if (query.Data == null)

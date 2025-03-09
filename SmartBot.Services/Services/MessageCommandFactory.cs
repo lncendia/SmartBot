@@ -2,6 +2,7 @@
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using Telegram.Bot.Types;
+using IRequest = MediatR.IRequest;
 using User = SmartBot.Abstractions.Models.User;
 
 namespace SmartBot.Services.Services;
@@ -17,7 +18,7 @@ public class MessageCommandFactory : IMessageCommandFactory
     /// <param name="user">Пользователь, отправивший сообщение.</param>
     /// <param name="message">Текстовое сообщение.</param>
     /// <returns>Команда для обработки сообщения или null, если команда не найдена.</returns>
-    public TelegramCommand? GetCommand(User? user, Message message)
+    public IRequest? GetCommand(User? user, Message message)
     {
         // Проверяем, существует ли пользователь
         if (user == null)

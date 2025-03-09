@@ -4,6 +4,7 @@ using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Models;
+using SmartBot.Services.Keyboards.ExaminerKeyboard;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 
@@ -16,7 +17,8 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
 public class AddCommentCommandHandler(
     ITelegramBotClient client,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IDateTimeProvider dateTimeProvider)
     : IRequestHandler<AddCommentCommand>
 {
     /// <summary>
@@ -30,7 +32,7 @@ public class AddCommentCommandHandler(
     /// </summary>
     private const string ReportNotFoundMessage =
         "<b>❌ Ошибка:</b> Отчёт не найден. Возможно, он был удалён или ещё не создан.";
-    
+
     /// <summary>
     /// Сообщение, которое отправляется, если у пользователя не установлен идентификатор проверяемого отчёта.
     /// </summary>
@@ -57,12 +59,43 @@ public class AddCommentCommandHandler(
         "Теперь вы можете продолжить работу с другими отчётами.";
 
     /// <summary>
+    /// Сообщение, которое отправляется, если отчёт уже выгружен и комментарий не может быть добавлен.
+    /// </summary>
+    private const string ReportAlreadyExportedMessage =
+        "<b>⚠️ Информация:</b> Отчёт уже выгружен.\n\n" +
+        "Комментарий не может быть добавлен к выгруженному отчёту.";
+    
+    /// <summary>
     /// Обрабатывает команду добавления комментария к отчёту.
     /// </summary>
     /// <param name="request">Запрос, содержащий данные о команде.</param>
     /// <param name="cancellationToken">Токен отмены операции.</param>
     public async Task Handle(AddCommentCommand request, CancellationToken cancellationToken)
     {
+        // Проверяем, является ли пользователь проверяющим
+        if (!request.User!.IsExaminer)
+        {
+            // Устанавливаем проверяющему состояние AwaitingReportInput
+            request.User.State = State.AwaitingReportInput;
+
+            // Удаляем идентификатор проверяемого отчёта
+            request.User.ReviewingReportId = null;
+
+            // Сохраняем изменения в базе данных
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // Отправляем сообщение о том, что пользователь не является проверяющим
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: NotExaminerMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: cancellationToken
+            );
+
+            // Завершаем выполнение метода
+            return;
+        }
+        
         // Проверяем, что комментарий не пустой
         if (string.IsNullOrWhiteSpace(request.Comment))
         {
@@ -71,27 +104,7 @@ public class AddCommentCommandHandler(
                 chatId: request.ChatId,
                 text: EmptyCommentMessage,
                 parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
-
-        // Проверяем, является ли пользователь проверяющим
-        if (!request.User!.IsExaminer)
-        {
-            // Устанавливаем проверяющему состояние AwaitingReportInput
-            request.User.State = State.AwaitingReportInput;
-
-            // Сохраняем изменения в базе данных
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            
-            // Отправляем сообщение о том, что пользователь не является проверяющим
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: NotExaminerMessage,
-                parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -107,7 +120,7 @@ public class AddCommentCommandHandler(
 
             // Сохраняем изменения в базе данных
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            
+
             // Отправляем сообщение о том, что идентификатор не установлен
             await client.SendMessage(
                 chatId: request.ChatId,
@@ -129,14 +142,38 @@ public class AddCommentCommandHandler(
 
             // Удаляем идентификатор проверяемого отчёта
             request.User.ReviewingReportId = null;
-            
+
             // Сохраняем изменения в базе данных
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            
+
             // Отправляем сообщение о том, что отчёт не найден
             await client.SendMessage(
                 chatId: request.ChatId,
                 text: ReportNotFoundMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: cancellationToken
+            );
+
+            // Завершаем выполнение метода
+            return;
+        }
+
+        // Если это не сегодняшний отчёт
+        if (report.Date.Date != dateTimeProvider.Now.Date)
+        {
+            // Устанавливаем проверяющему состояние Idle
+            request.User.State = State.Idle;
+
+            // Удаляем идентификатор проверяемого отчёта
+            request.User.ReviewingReportId = null;
+            
+            // Сохраняем изменения в базе данных
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            
+            // Отправляем сообщение о том, что это не сегодняшний отчёт
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: ReportAlreadyExportedMessage,
                 parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken
             );
@@ -162,6 +199,7 @@ public class AddCommentCommandHandler(
                 chatId: request.ChatId,
                 text: CommentTooLongMessage,
                 parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 

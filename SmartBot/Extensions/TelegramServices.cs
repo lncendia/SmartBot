@@ -55,6 +55,7 @@ public static class TelegramServices
         // Регистрируем провайдер времени (IDateTimeProvider) как Singleton
         services.AddSingleton<IDateTimeProvider, MoscowDateTimeProvider>();
 
+        // Регистрируем сервис синхронизации действий пользователей
         services.AddSingleton<IUserSynchronizationService, UserSynchronizationService>();
 
         // Регистрируем настройки вебхука

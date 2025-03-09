@@ -13,7 +13,7 @@ public static class DateTimeExtensions
     public static bool IsWorkingPeriod(this DateTime dateTime)
     {
         // Проверяем, что время находится в диапазоне с 9:00 до 22:00 и это не выходной день.
-        return dateTime.Hour is >= 9 and < 22 && !dateTime.IsWeekend();
+        return dateTime.Hour >= 9 && !dateTime.IsWeekend();
     }
 
     /// <summary>
@@ -72,6 +72,24 @@ public static class DateTimeExtensions
     {
         // Суббота или воскресенье
         return dateTime.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+    }
+    
+    /// <summary>
+    /// Проверяет, является ли предыдущий день (относительно указанной даты) выходным.
+    /// Используется для фоновых процессов, которые запускаются в 00:00 следующего дня.
+    /// Например:
+    /// - Для понедельника проверяется воскресенье.
+    /// - Для субботы проверяется пятница.
+    /// </summary>
+    /// <param name="dateTime">Дата, для которой проверяется предыдущий день.</param>
+    /// <returns>true, если предыдущий день является выходным; в противном случае — false.</returns>
+    public static bool IsPreviousDayWeekend(this DateTime dateTime)
+    {
+        // Получаем предыдущий день
+        var previousDay = dateTime.AddDays(-1);
+
+        // Проверяем, является ли предыдущий день выходным
+        return previousDay.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
     }
     
     /// <summary>

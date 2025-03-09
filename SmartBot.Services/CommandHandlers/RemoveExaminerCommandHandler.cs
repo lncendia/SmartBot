@@ -5,6 +5,7 @@ using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Models;
+using SmartBot.Services.Keyboards.ExaminerKeyboard;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
@@ -67,21 +68,6 @@ public class RemoveExaminerCommandHandler(
     /// <param name="cancellationToken">Токен отмены операции.</param>
     public async Task Handle(RemoveExaminerCommand request, CancellationToken cancellationToken)
     {
-        // Пытаемся преобразовать строку ExaminerId в число (long)
-        if (!long.TryParse(request.ExaminerId, out var examinerId))
-        {
-            // Если преобразование не удалось, отправляем сообщение об ошибке
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: InvalidUserIdFormatMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
-        
         // Проверяем, является ли пользователь проверяющим
         if (!request.User!.IsExaminer)
         {
@@ -102,6 +88,22 @@ public class RemoveExaminerCommandHandler(
             // Завершаем выполнение метода
             return;
         }
+        
+        // Пытаемся преобразовать строку ExaminerId в число (long)
+        if (!long.TryParse(request.ExaminerId, out var examinerId))
+        {
+            // Если преобразование не удалось, отправляем сообщение об ошибке
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: InvalidUserIdFormatMessage,
+                parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
+                cancellationToken: cancellationToken
+            );
+
+            // Завершаем выполнение метода
+            return;
+        }
 
         // Получаем пользователя, которого нужно удалить из числа проверяющих
         var examinerToRemove = await unitOfWork.Query<User>()
@@ -115,6 +117,7 @@ public class RemoveExaminerCommandHandler(
                 chatId: request.ChatId,
                 text: UserNotFoundMessage,
                 parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -130,6 +133,7 @@ public class RemoveExaminerCommandHandler(
                 chatId: request.ChatId,
                 text: NotAnExaminerMessage,
                 parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 

@@ -117,7 +117,7 @@ public class UpdateHandler : IUpdateHandler
     /// Обрабатывает входящий callback-запрос.
     /// </summary>
     /// <param name="callbackQuery">Callback-запрос.</param>
-    /// <param name="cancellationToken"></param>
+    /// <param name="cancellationToken">Токен отмены.</param>
     private async Task BotOnCallbackQueryReceived(CallbackQuery callbackQuery, CancellationToken cancellationToken)
     {
         // Получаем пользователя из базы данных
@@ -155,7 +155,7 @@ public class UpdateHandler : IUpdateHandler
     /// Обрабатывает входящее сообщение.
     /// </summary>
     /// <param name="message">Сообщение.</param>
-    /// <param name="cancellationToken"></param>
+    /// <param name="cancellationToken">Токен отмены.</param>
     private async Task BotOnMessageReceived(Message message, CancellationToken cancellationToken)
     {
         // Если отправитель сообщения неизвестен - не продолжаем

@@ -5,6 +5,7 @@ using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Models;
+using SmartBot.Services.Keyboards.ExaminerKeyboard;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
@@ -59,7 +60,7 @@ public class AddExaminerCommandHandler(
     /// </summary>
     private const string InvalidUserIdFormatMessage =
         "<b>❌ Ошибка:</b> Некорректный формат ID пользователя. Пожалуйста, введите числовой идентификатор.";
-    
+
     /// <summary>
     /// Обрабатывает команду добавления нового проверяющего.
     /// </summary>
@@ -67,21 +68,6 @@ public class AddExaminerCommandHandler(
     /// <param name="cancellationToken">Токен отмены операции.</param>
     public async Task Handle(AddExaminerCommand request, CancellationToken cancellationToken)
     {
-        // Пытаемся преобразовать строку ExaminerId в число (long)
-        if (!long.TryParse(request.ExaminerId, out var examinerId))
-        {
-            // Если преобразование не удалось, отправляем сообщение об ошибке
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: InvalidUserIdFormatMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
-        
         // Проверяем, является ли пользователь проверяющим
         if (!request.User!.IsExaminer)
         {
@@ -90,12 +76,28 @@ public class AddExaminerCommandHandler(
 
             // Сохраняем изменения в базе данных
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            
+
             // Отправляем сообщение о том, что пользователь не является проверяющим
             await client.SendMessage(
                 chatId: request.ChatId,
                 text: NotExaminerMessage,
                 parseMode: ParseMode.Html,
+                cancellationToken: cancellationToken
+            );
+
+            // Завершаем выполнение метода
+            return;
+        }
+
+        // Пытаемся преобразовать строку ExaminerId в число (long)
+        if (!long.TryParse(request.ExaminerId, out var examinerId))
+        {
+            // Если преобразование не удалось, отправляем сообщение об ошибке
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: InvalidUserIdFormatMessage,
+                parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -115,6 +117,7 @@ public class AddExaminerCommandHandler(
                 chatId: request.ChatId,
                 text: UserNotFoundMessage,
                 parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -130,6 +133,7 @@ public class AddExaminerCommandHandler(
                 chatId: request.ChatId,
                 text: AlreadyExaminerMessage,
                 parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -140,7 +144,7 @@ public class AddExaminerCommandHandler(
         // Назначаем пользователя проверяющим
         newExaminer.IsExaminer = true;
         newExaminer.State = State.Idle;
-        
+
         // Устанавливаем состояние текущего пользователя на Idle
         request.User.State = State.Idle;
 

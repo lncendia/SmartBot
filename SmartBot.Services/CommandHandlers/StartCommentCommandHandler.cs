@@ -17,10 +17,12 @@ namespace SmartBot.Services.CommandHandlers;
 /// </summary>
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
+/// <param name="dateTimeProvider">Провайдер для работы с текущим временем.</param>
 /// <param name="logger">Логгер.</param>
 public class StartCommentCommandHandler(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
+    IDateTimeProvider dateTimeProvider,
     ILogger<StartCommentCommandHandler> logger)
     : IRequestHandler<StartCommentCommand>
 {
@@ -42,6 +44,13 @@ public class StartCommentCommandHandler(
     private const string AwaitingCommentMessage =
         "<b>📝 Введите комментарий к отчёту:</b>\n\n" +
         "Пожалуйста, укажите ваши замечания или рекомендации для улучшения отчёта.";
+    
+    /// <summary>
+    /// Сообщение, которое отправляется, если отчёт уже выгружен и комментарий не может быть добавлен.
+    /// </summary>
+    private const string ReportAlreadyExportedMessage =
+        "<b>⚠️ Информация:</b> Отчёт уже выгружен.\n\n" +
+        "Комментарий не может быть добавлен к выгруженному отчёту.";
 
     /// <summary>
     /// Обрабатывает команду начала ввода комментария к отчёту.
@@ -112,6 +121,36 @@ public class StartCommentCommandHandler(
             await client.SendMessage(
                 chatId: request.ChatId,
                 text: ReportNotFoundMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: cancellationToken
+            );
+
+            // Завершаем выполнение метода
+            return;
+        }
+        
+        // Если это не сегодняшний отчёт
+        if (report.Date.Date != dateTimeProvider.Now.Date)
+        {
+            try
+            {
+                // Удаляем сообщение с командой
+                await client.DeleteMessage(
+                    chatId: request.ChatId,
+                    messageId: request.MessageId,
+                    cancellationToken: cancellationToken
+                );
+            }
+            catch (ApiRequestException ex)
+            {
+                // Логируем ошибку, если не удалось удалить сообщение
+                logger.LogWarning(ex, "The message with the ID {messageId} could not be deleted.", request.MessageId);
+            }
+
+            // Отправляем сообщение о том, что это не сегодняшний отчёт
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: ReportAlreadyExportedMessage,
                 parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken
             );

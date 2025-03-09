@@ -5,6 +5,7 @@ using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Models;
+using SmartBot.Services.Keyboards.ExaminerKeyboard;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
@@ -61,21 +62,6 @@ public class RemoveUserCommandHandler(
     /// <param name="cancellationToken">Токен отмены операции.</param>
     public async Task Handle(RemoveUserCommand request, CancellationToken cancellationToken)
     {
-        // Пытаемся преобразовать строку UserId в число (long)
-        if (!long.TryParse(request.UserId, out var userId))
-        {
-            // Если преобразование не удалось, отправляем сообщение об ошибке
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: InvalidUserIdFormatMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
-        
         // Проверяем, является ли пользователь проверяющим
         if (!request.User!.IsExaminer)
         {
@@ -84,6 +70,22 @@ public class RemoveUserCommandHandler(
                 chatId: request.ChatId,
                 text: NotExaminerMessage,
                 parseMode: ParseMode.Html,
+                cancellationToken: cancellationToken
+            );
+
+            // Завершаем выполнение метода
+            return;
+        }
+        
+        // Пытаемся преобразовать строку UserId в число (long)
+        if (!long.TryParse(request.UserId, out var userId))
+        {
+            // Если преобразование не удалось, отправляем сообщение об ошибке
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: InvalidUserIdFormatMessage,
+                parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -103,6 +105,7 @@ public class RemoveUserCommandHandler(
                 chatId: request.ChatId,
                 text: UserNotFoundMessage,
                 parseMode: ParseMode.Html,
+                replyMarkup: ExamKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 

@@ -1,5 +1,5 @@
-using SmartBot.Abstractions.Commands;
 using Telegram.Bot.Types;
+using IRequest = MediatR.IRequest;
 using User = SmartBot.Abstractions.Models.User;
 
 namespace SmartBot.Abstractions.Interfaces;
@@ -15,5 +15,5 @@ public interface IMessageCommandFactory
     /// <param name="user">Пользователь</param>
     /// <param name="message">Сообщение</param>
     /// <returns>Команда или null, если команда не найдена</returns>
-    TelegramCommand? GetCommand(User? user, Message message);
+    IRequest? GetCommand(User? user, Message message);
 }

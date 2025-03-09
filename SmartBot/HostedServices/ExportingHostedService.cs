@@ -35,16 +35,14 @@ public class ExportingHostedService(
         // Получаем текущее время
         var now = dateTimeProvider.Now;
 
-        // Вычисляем время до следующего запуска (22:00 сегодня или завтра)
-        var nextRunTime = now.TimeOfDay >= TimeSpan.FromHours(22)
-            ? now.Date.AddDays(1).AddHours(22) // Если уже позже 22:00, запускаем завтра
-            : now.Date.AddHours(22); // Иначе запускаем сегодня в 22:00
+        // Вычисляем время до следующего запуска (00:00 следующего дня)
+        var nextRunTime = now.Date.AddDays(1);
 
         // Вычисляем интервал до следующего запуска
         var timeUntilNextRun = nextRunTime - now;
 
         // Создаем таймер, который запускает метод ExportReports в указанное время
-        _timer = new Timer(ExportReports, null, TimeSpan.Zero, TimeSpan.FromDays(1));
+        _timer = new Timer(ExportReports, null, timeUntilNextRun, TimeSpan.FromDays(1));
 
         // Возвращаем завершенный Task, так как метод синхронный
         return Task.CompletedTask;
@@ -74,7 +72,7 @@ public class ExportingHostedService(
         try
         {
             // Если сегодня выходной день, то не экспортируем отчёты.
-            if (dateTimeProvider.Now.IsWeekend()) return;
+            if (dateTimeProvider.Now.IsPreviousDayWeekend()) return;
 
             // Создаем область (scope) для работы с зависимостями (DI)
             using var scope = serviceProvider.CreateScope();
@@ -163,7 +161,7 @@ public class ExportingHostedService(
                         Position = userGroup.User.Position,
 
                         // Дата отчёта (если отчёт есть, иначе текущая дата)
-                        Date = report != null ? report.Date.Date : dateTimeProvider.Now.Date,
+                        Date = report != null ? report.Date.Date : dateTimeProvider.Now.Date.AddDays(-1),
 
                         // Утренний отчёт
                         MorningReport = report != null ? report.MorningReport.Data : null,
