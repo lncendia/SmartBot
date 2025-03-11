@@ -485,4 +485,4 @@ $RECYCLE.BIN/
 
 database.db
 appsettings.Production.json
-google.credentials.json
+google.credentials*

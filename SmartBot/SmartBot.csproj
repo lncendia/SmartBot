@@ -24,7 +24,10 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Content Update="google.credentials.json">
+      <Content Update="google.credentials.development.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
+      <Content Update="google.credentials.production.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </Content>
     </ItemGroup>
