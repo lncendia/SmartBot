@@ -26,7 +26,7 @@ public class ExportingHostedService(
 
     /// <summary>
     /// Метод, который запускается при старте приложения.
-    /// Настраивает таймер для запуска задачи экспорта отчётов каждый день в 20:00.
+    /// Настраивает таймер для запуска задачи экспорта отчётов каждый день в 00:00.
     /// </summary>
     /// <param name="cancellationToken">Токен отмены.</param>
     /// <returns>Задача, представляющая асинхронную операцию.</returns>
@@ -93,7 +93,7 @@ public class ExportingHostedService(
             if (exporterData == null)
             {
                 // Устанавливаем дату последнего экспорта на текущую дату
-                lastExportedDate = dateTimeProvider.Now.Date;
+                lastExportedDate = dateTimeProvider.Now.Date.AddDays(-1);
 
                 // Создаем новый объект для хранения данных экспорта
                 exporterData = new Exporter();

@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
 using SmartBot.Infrastructure.Services.ReportAnalyzer.RequestModels;
 using SmartBot.Infrastructure.Services.ReportAnalyzer.ResponseModels;
@@ -11,7 +12,8 @@ namespace SmartBot.Infrastructure.Services.ReportAnalyzer;
 /// </summary>
 /// <param name="configuration">Конфигурация анализатора, содержащая модель и подсказку.</param>
 /// <param name="clientFactory">IHttpClientFactory для отправки HTTP-запросов.</param>
-public class ReportAnalyzer(AnalyzerConfiguration configuration, IHttpClientFactory clientFactory) : IReportAnalyzer
+/// <param name="logger">Логгер.</param>
+public class ReportAnalyzer(AnalyzerConfiguration configuration, IHttpClientFactory clientFactory, ILogger<ReportAnalyzer> logger) : IReportAnalyzer
 {
     /// <summary>
     /// Имя HttpClient для фабрики.
@@ -129,23 +131,35 @@ public class ReportAnalyzer(AnalyzerConfiguration configuration, IHttpClientFact
         // Чтение ответа от API в виде строки
         var responseJson = await response.Content.ReadAsStringAsync(token);
 
-        // Десериализация JSON-ответа в объект OpenRouterResponse
-        var openRouterResponse = JsonSerializer.Deserialize<OpenRouterResponse>(responseJson);
-
-        // Извлечение содержимого ответа (message.content)
-        var responseContent = openRouterResponse!.Choices.First().Message.Content;
-
-        // Десериализация содержимого ответа в объект Report
-        var aiResponse = JsonSerializer.Deserialize<Report>(responseContent);
-
-        // Возврат результата анализа
-        return new ReportAnalyzeResult
+        try
         {
-            // Оценка отчёта
-            Score = aiResponse!.Score,
 
-            // Рекомендации по отчёту
-            Recommendations = aiResponse.Edit
-        };
+            // Десериализация JSON-ответа в объект OpenRouterResponse
+            var openRouterResponse = JsonSerializer.Deserialize<OpenRouterResponse>(responseJson);
+
+            // Извлечение содержимого ответа (message.content)
+            var responseContent = openRouterResponse!.Choices.First().Message.Content;
+
+            // Десериализация содержимого ответа в объект Report
+            var aiResponse = JsonSerializer.Deserialize<Report>(responseContent);
+
+            // Возврат результата анализа
+            return new ReportAnalyzeResult
+            {
+                // Оценка отчёта
+                Score = aiResponse!.Score,
+
+                // Рекомендации по отчёту
+                Recommendations = aiResponse.Edit
+            };
+        }
+        catch (JsonException)
+        {
+            // Логгируем информацию
+            logger.LogWarning("The Openrouter response could not be processed: {response}", responseJson);
+            
+            // Пробрасываем исключение дальше
+            throw;
+        }
     }
 }
