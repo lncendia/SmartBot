@@ -2,7 +2,7 @@
 using Telegram.Bot.Types;
 using User = SmartBot.Abstractions.Models.User;
 
-namespace SmartBot.Abstractions.Commands;
+namespace SmartBot.Abstractions.Commands.Abstractions;
 
 /// <summary>
 /// Абстрактная команда для Telegram

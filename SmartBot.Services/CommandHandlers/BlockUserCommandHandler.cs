@@ -5,7 +5,7 @@ using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Models;
-using SmartBot.Services.Keyboards.ExaminerKeyboard;
+using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
@@ -18,18 +18,12 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
 /// <param name="logger">Логгер.</param>
-public class RemoveUserCommandHandler(
+public class BlockUserCommandHandler(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
-    ILogger<RemoveUserCommandHandler> logger)
-    : IRequestHandler<RemoveUserCommand>
+    ILogger<BlockUserCommandHandler> logger)
+    : IRequestHandler<BlockUserCommand>
 {
-    /// <summary>
-    /// Сообщение, которое отправляется, если пользователь не является проверяющим.
-    /// </summary>
-    private const string NotExaminerMessage =
-        "<b>❌ Ошибка:</b> Вы не являетесь проверяющим. Только проверяющие могут удалять пользователей.";
-
     /// <summary>
     /// Сообщение, которое отправляется, если пользователь не найден.
     /// </summary>
@@ -48,54 +42,17 @@ public class RemoveUserCommandHandler(
     private const string UserRemovedNotificationMessage =
         "<b>ℹ️ Уведомление:</b>\n\n" +
         "Ваш аккаунт был заблокирован. Вы больше не можете использовать бота.";
-
-    /// <summary>
-    /// Сообщение об ошибке, которое отправляется, если введённый ID пользователя имеет некорректный формат.
-    /// </summary>
-    private const string InvalidUserIdFormatMessage =
-        "<b>❌ Ошибка:</b> Некорректный формат ID пользователя. Пожалуйста, введите числовой идентификатор.";
     
     /// <summary>
     /// Обрабатывает команду удаления пользователя.
     /// </summary>
     /// <param name="request">Запрос, содержащий данные о команде.</param>
     /// <param name="cancellationToken">Токен отмены операции.</param>
-    public async Task Handle(RemoveUserCommand request, CancellationToken cancellationToken)
+    public async Task Handle(BlockUserCommand request, CancellationToken cancellationToken)
     {
-        // Проверяем, является ли пользователь проверяющим
-        if (!request.User!.IsExaminer)
-        {
-           // Отправляем сообщение о том, что пользователь не является проверяющим
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: NotExaminerMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
-        
-        // Пытаемся преобразовать строку UserId в число (long)
-        if (!long.TryParse(request.UserId, out var userId))
-        {
-            // Если преобразование не удалось, отправляем сообщение об ошибке
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: InvalidUserIdFormatMessage,
-                parseMode: ParseMode.Html,
-                replyMarkup: ExamKeyboard.GoBackKeyboard,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
-
         // Получаем пользователя, которого нужно удалить
         var userToRemove = await unitOfWork.Query<User>()
-            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+            .FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
 
         // Если пользователь не найден
         if (userToRemove == null)
@@ -105,7 +62,7 @@ public class RemoveUserCommandHandler(
                 chatId: request.ChatId,
                 text: UserNotFoundMessage,
                 parseMode: ParseMode.Html,
-                replyMarkup: ExamKeyboard.GoBackKeyboard,
+                replyMarkup: AdminKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -114,13 +71,10 @@ public class RemoveUserCommandHandler(
         }
 
         // Устанавливаем состояние пользователя на Blocked
-        userToRemove.State = State.Blocked;
+        userToRemove.Role = Role.Blocked;
 
-        // Удаляем пользователя из числа проверяющих
-        userToRemove.IsExaminer = false;
-        
         // Устанавливаем состояние текущего пользователя на Idle
-        request.User.State = State.Idle;
+        request.User!.State = State.Idle;
 
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -129,8 +83,9 @@ public class RemoveUserCommandHandler(
         await client.SendMessage(
             chatId: request.ChatId,
             text: UserRemovedSuccessMessage,
+            replyMarkup: AdminKeyboard.GoBackKeyboard,
             parseMode: ParseMode.Html,
-            cancellationToken: cancellationToken
+            cancellationToken: CancellationToken.None
         );
 
         // Отправляем сообщение удалённому пользователю
@@ -140,7 +95,7 @@ public class RemoveUserCommandHandler(
                 chatId: userToRemove.Id,
                 text: UserRemovedNotificationMessage,
                 parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
+                cancellationToken: CancellationToken.None
             );
         }
         catch (ApiRequestException ex)

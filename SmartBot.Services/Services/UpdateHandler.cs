@@ -128,7 +128,7 @@ public class UpdateHandler : IUpdateHandler
         if (user == null) return;
         
         // Если пользователь заблокирован - не продолжаем
-        if (user.State == State.Blocked) return;
+        if (user.Role == Role.Blocked) return;
 
         // Создаем команду на основе callback-запроса
         var command = _callbackQueryCommandFactory.GetCommand(user, callbackQuery);
@@ -171,7 +171,7 @@ public class UpdateHandler : IUpdateHandler
                 .FirstOrDefaultAsync(u => u.Id == message.From.Id, cancellationToken: cancellationToken);
 
             // Если пользователь заблокирован - не продолжаем
-            if (user?.State == State.Blocked) return;
+            if (user?.Role == Role.Blocked) return;
 
             // Создаем команду на основе сообщения
             var command = _messageCommandFactory.GetCommand(user, message);

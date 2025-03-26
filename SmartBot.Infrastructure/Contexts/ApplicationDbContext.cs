@@ -24,6 +24,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // Применяем конфигурацию для сущности Exporter
         modelBuilder.ApplyConfiguration(new ExporterConfiguration());
         
+        // Применяем конфигурацию для сущности WorkingChat
+        modelBuilder.ApplyConfiguration(new WorkingChatConfiguration());
+        
         // Вызываем базовую реализацию метода
         base.OnModelCreating(modelBuilder);
     }

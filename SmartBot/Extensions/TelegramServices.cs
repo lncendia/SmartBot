@@ -20,6 +20,9 @@ public static class TelegramServices
     {
         // Получаем токен бота из конфигурации
         var token = configuration.GetRequiredValue<string>("Telegram:Token");
+        
+        // Получаем максимальную степень параллелизма рассылок
+        var maxDegreeOfParallelism = configuration.GetRequiredValue<int>("Telegram:MaxDegreeOfMailingParallelism");
 
         // Создаем объект настроек вебхука
         var webhookSettings = new WebhookSettings
@@ -36,13 +39,13 @@ public static class TelegramServices
 
         // Регистрируем HttpClient с именем "TgWebhook" для использования в TelegramBotClient
         services.AddHttpClient("TgWebhook")
-            
+
             // Регистрируем типизированный клиент ITelegramBotClient
             .AddTypedClient<ITelegramBotClient>(httpClient => new TelegramBotClient(token, httpClient));
 
         // Настройте ASP.NET Json десериализацию для типов Telegram.Bot
         services.ConfigureTelegramBotMvc();
-        
+
         // Регистрируем обработчик обновлений (IUpdateHandler) как Scoped-сервис
         services.AddScoped<IUpdateHandler, UpdateHandler>();
 
@@ -63,5 +66,8 @@ public static class TelegramServices
 
         // Регистрируем фоновый сервис для настройки вебхука
         services.AddHostedService<WebhookBackgroundService>();
+
+        // Регистрируем настройки параллелизма
+        services.AddScoped<ParallelOptions>(_ => new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism });
     }
 }

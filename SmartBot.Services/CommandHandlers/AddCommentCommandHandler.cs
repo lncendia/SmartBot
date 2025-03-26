@@ -4,7 +4,7 @@ using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Models;
-using SmartBot.Services.Keyboards.ExaminerKeyboard;
+using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 
@@ -22,22 +22,10 @@ public class AddCommentCommandHandler(
     : IRequestHandler<AddCommentCommand>
 {
     /// <summary>
-    /// Сообщение, которое отправляется пользователю, если он не является проверяющим.
-    /// </summary>
-    private const string NotExaminerMessage =
-        "<b>❌ Ошибка:</b> Вы не являетесь проверяющим. Только проверяющие могут оставлять комментарии к отчётам.";
-
-    /// <summary>
     /// Сообщение, которое отправляется, если отчёт не найден.
     /// </summary>
     private const string ReportNotFoundMessage =
         "<b>❌ Ошибка:</b> Отчёт не найден. Возможно, он был удалён или ещё не создан.";
-
-    /// <summary>
-    /// Сообщение, которое отправляется, если у пользователя не установлен идентификатор проверяемого отчёта.
-    /// </summary>
-    private const string ReportIdNotSetMessage =
-        "<b>❌ Ошибка:</b> Отчёт для комментирования не выбран.";
 
     /// <summary>
     /// Сообщение, которое отправляется, если комментарий пустой.
@@ -72,29 +60,6 @@ public class AddCommentCommandHandler(
     /// <param name="cancellationToken">Токен отмены операции.</param>
     public async Task Handle(AddCommentCommand request, CancellationToken cancellationToken)
     {
-        // Проверяем, является ли пользователь проверяющим
-        if (!request.User!.IsExaminer)
-        {
-            // Устанавливаем проверяющему состояние AwaitingReportInput
-            request.User.State = State.AwaitingReportInput;
-
-            // Удаляем идентификатор проверяемого отчёта
-            request.User.ReviewingReportId = null;
-
-            // Сохраняем изменения в базе данных
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-
-            // Отправляем сообщение о том, что пользователь не является проверяющим
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: NotExaminerMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
         
         // Проверяем, что комментарий не пустой
         if (string.IsNullOrWhiteSpace(request.Comment))
@@ -104,7 +69,7 @@ public class AddCommentCommandHandler(
                 chatId: request.ChatId,
                 text: EmptyCommentMessage,
                 parseMode: ParseMode.Html,
-                replyMarkup: ExamKeyboard.GoBackKeyboard,
+                replyMarkup: AdminKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -112,33 +77,15 @@ public class AddCommentCommandHandler(
             return;
         }
 
-        // Если у пользователя не установлен идентификатор проверяемого отчёта
-        if (!request.User.ReviewingReportId.HasValue)
-        {
-            // Устанавливаем проверяющему состояние Idle
-            request.User.State = State.Idle;
-
-            // Сохраняем изменения в базе данных
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-
-            // Отправляем сообщение о том, что идентификатор не установлен
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: ReportIdNotSetMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-        }
-
         // Получаем отчёт, который проверяет пользователь
         var report = await unitOfWork.Query<Report>()
-            .FirstOrDefaultAsync(r => r.Id == request.User.ReviewingReportId, cancellationToken);
+            .FirstOrDefaultAsync(r => r.Id == request.User!.ReviewingReportId, cancellationToken);
 
         // Если отчёт не найден
         if (report == null)
         {
-            // Устанавливаем проверяющему состояние Idle
-            request.User.State = State.Idle;
+            // Устанавливаем администратору состояние Idle
+            request.User!.State = State.Idle;
 
             // Удаляем идентификатор проверяемого отчёта
             request.User.ReviewingReportId = null;
@@ -151,7 +98,7 @@ public class AddCommentCommandHandler(
                 chatId: request.ChatId,
                 text: ReportNotFoundMessage,
                 parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
+                cancellationToken: CancellationToken.None
             );
 
             // Завершаем выполнение метода
@@ -161,8 +108,8 @@ public class AddCommentCommandHandler(
         // Если это не сегодняшний отчёт
         if (report.Date.Date != dateTimeProvider.Now.Date)
         {
-            // Устанавливаем проверяющему состояние Idle
-            request.User.State = State.Idle;
+            // Устанавливаем администратору состояние Idle
+            request.User!.State = State.Idle;
 
             // Удаляем идентификатор проверяемого отчёта
             request.User.ReviewingReportId = null;
@@ -175,7 +122,7 @@ public class AddCommentCommandHandler(
                 chatId: request.ChatId,
                 text: ReportAlreadyExportedMessage,
                 parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
+                cancellationToken: CancellationToken.None
             );
 
             // Завершаем выполнение метода
@@ -199,7 +146,7 @@ public class AddCommentCommandHandler(
                 chatId: request.ChatId,
                 text: CommentTooLongMessage,
                 parseMode: ParseMode.Html,
-                replyMarkup: ExamKeyboard.GoBackKeyboard,
+                replyMarkup: AdminKeyboard.GoBackKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -211,7 +158,7 @@ public class AddCommentCommandHandler(
         report.Comment = newComment;
 
         // Устанавливаем состояние пользователя на Idle
-        request.User.State = State.Idle;
+        request.User!.State = State.Idle;
 
         // Сбрасываем ID проверяемого отчёта
         request.User.ReviewingReportId = null;
@@ -224,7 +171,7 @@ public class AddCommentCommandHandler(
             chatId: request.ChatId,
             text: CommentAddedSuccessMessage,
             parseMode: ParseMode.Html,
-            cancellationToken: cancellationToken
+            cancellationToken: CancellationToken.None
         );
     }
 }

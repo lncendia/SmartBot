@@ -18,10 +18,12 @@ namespace SmartBot.Services.Services;
 /// <param name="unitOfWork">Единица работы для взаимодействия с базой данных.</param>
 /// <param name="dateTimeProvider">Провайдер времени для работы с датами и временем.</param>
 /// <param name="logger">Логгер для записи событий и ошибок.</param>
+/// <param name="options">Настройки параллелизма для рассылки сообщений.</param>
 public class NotificationService(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
     IDateTimeProvider dateTimeProvider,
+    ParallelOptions options,
     ILogger<NotificationService> logger) : INotificationService
 {
     /// <summary>
@@ -110,18 +112,15 @@ public class NotificationService(
             // Фильтруем пользователей, у которых нет отчётов за текущий день.
             .Where(u => u.Reports.All(r => r.Date.Date != now.Date))
 
-            // Фильтруем пользователей, не являющихся проверяющими
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые должны ввести отчёт
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей.
             .Select(u => u.Id)
 
             // Преобразуем результат в список.
             .ToListAsync(cancellationToken);
-        
+
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт
         await SendMessagesAsync(users, MorningReportMessage, cancellationToken);
     }
@@ -143,18 +142,15 @@ public class NotificationService(
             // Фильтруем пользователей, у которых нет отчётов за текущий день.
             .Where(u => u.Reports.All(r => r.Date.Date != now.Date))
 
-            // Фильтруем пользователей, не являющихся проверяющими
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые должны ввести отчёт
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей.
             .Select(u => u.Id)
 
             // Преобразуем результат в список.
             .ToListAsync(cancellationToken);
-        
+
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт
         await SendMessagesAsync(users, MorningDeadlineApproachingMessage, cancellationToken);
     }
@@ -176,11 +172,8 @@ public class NotificationService(
             // Фильтруем пользователей, у которых нет отчётов за текущий день.
             .Where(u => u.Reports.All(r => r.Date.Date != now.Date))
 
-            // Фильтруем пользователей, не являющихся проверяющими
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые должны ввести отчёт
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей.
             .Select(u => u.Id)
@@ -209,11 +202,8 @@ public class NotificationService(
             // Фильтруем пользователей, у которых есть утренний отчёт за сегодня, но нет вечернего.
             .Where(u => u.Reports.Any(r => r.Date.Date == now.Date && r.EveningReport == null))
 
-            // Исключаем проверяющих (examiners) из списка.
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые находятся в состоянии ожидания ввода отчёта.
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
@@ -227,11 +217,8 @@ public class NotificationService(
             // Фильтруем пользователей, у которых либо вообще нет отчётов за сегодня
             .Where(u => u.Reports.All(r => r.Date.Date != now.Date))
 
-            // Исключаем проверяющих (examiners) из списка.
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые находятся в состоянии ожидания ввода отчёта.
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
@@ -263,11 +250,8 @@ public class NotificationService(
             // Фильтруем пользователей, у которых есть утренний отчёт за сегодня, но нет вечернего.
             .Where(u => u.Reports.Any(r => r.Date.Date == now.Date && r.EveningReport == null))
 
-            // Исключаем проверяющих (examiners) из списка.
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые находятся в состоянии ожидания ввода отчёта.
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
@@ -281,11 +265,8 @@ public class NotificationService(
             // Фильтруем пользователей, у которых либо вообще нет отчётов за сегодня
             .Where(u => u.Reports.All(r => r.Date.Date != now.Date))
 
-            // Исключаем проверяющих (examiners) из списка.
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые находятся в состоянии ожидания ввода отчёта.
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
@@ -319,11 +300,8 @@ public class NotificationService(
             // Фильтруем пользователей, у которых есть утренний отчёт за сегодня, но нет вечернего.
             .Where(u => u.Reports.Any(r => r.Date.Date == now.Date && r.EveningReport == null))
 
-            // Исключаем проверяющих (examiners) из списка.
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые находятся в состоянии ожидания ввода отчёта.
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
@@ -337,11 +315,8 @@ public class NotificationService(
             // Фильтруем пользователей, у которых либо вообще нет отчётов за сегодня
             .Where(u => u.Reports.All(r => r.Date.Date != now.Date))
 
-            // Исключаем проверяющих (examiners) из списка.
-            .Where(u => !u.IsExaminer)
-
-            // Фильтруем пользователей, которые находятся в состоянии ожидания ввода отчёта.
-            .Where(u => u.State == State.AwaitingReportInput)
+            // Фильтруем пользователей, не являющихся администратороми
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
@@ -365,22 +340,20 @@ public class NotificationService(
     /// <returns>Задача, представляющая асинхронную операцию.</returns>
     private async Task SendMessagesAsync(IEnumerable<long> userIds, string message, CancellationToken cancellationToken)
     {
-        // Настройка параметров для параллельного выполнения:
-        // - Максимальное количество параллельных задач: 3.
-        // - Токен отмены для возможности прерывания операции.
-        var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 3, CancellationToken = cancellationToken };
+        // Устанавливаем токен отмены операции
+        options.CancellationToken = cancellationToken;
 
         // Параллельная отправка сообщений каждому пользователю из списка.
-        await Parallel.ForEachAsync(userIds, parallelOptions, async (userId, ct) =>
+        await Parallel.ForEachAsync(userIds, options, async (userId, ct) =>
         {
             try
             {
                 // Отправка сообщения пользователю через Telegram API.
                 await client.SendMessage(
-                    chatId: userId,          // ID пользователя, которому отправляется сообщение.
-                    text: message,           // Текст сообщения.
+                    chatId: userId, // ID пользователя, которому отправляется сообщение.
+                    text: message, // Текст сообщения.
                     parseMode: ParseMode.Html, // Режим парсинга текста (HTML).
-                    cancellationToken: ct    // Токен отмены для текущей операции.
+                    cancellationToken: ct // Токен отмены для текущей операции.
                 );
             }
             catch (ApiRequestException ex) // Обработка ошибок, связанных с запросами к Telegram API.

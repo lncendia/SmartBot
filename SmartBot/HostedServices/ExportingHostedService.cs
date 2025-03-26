@@ -125,11 +125,8 @@ public class ExportingHostedService(
             // Получаем список отчётов для экспорта
             var reports = await unitOfWork.Query<User>()
 
-                // Фильтруем пользователей, не являющихся проверяющими
-                .Where(u => !u.IsExaminer)
-
-                // Фильтруем пользователей, не являющихся заблокированными
-                .Where(u => u.State != State.Blocked)
+                // Фильтруем пользователей, не являющихся администратороми
+                .Where(u => u.Role == Role.Employee)
 
                 // Выполняем LEFT JOIN между таблицами User и Report
                 .GroupJoin(

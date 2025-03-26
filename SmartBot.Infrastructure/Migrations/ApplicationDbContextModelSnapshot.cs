@@ -69,11 +69,8 @@ namespace SmartBot.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("IsExaminer")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Position")
-                        .HasMaxLength(100)
+                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RegistrationTime")
@@ -82,14 +79,43 @@ namespace SmartBot.Infrastructure.Migrations
                     b.Property<Guid?>("ReviewingReportId")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Role")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("SelectedWorkingChatId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("State")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("WorkingChatId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ReviewingReportId");
 
+                    b.HasIndex("SelectedWorkingChatId");
+
+                    b.HasIndex("WorkingChatId");
+
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("SmartBot.Abstractions.Models.WorkingChat", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WorkingChats", (string)null);
                 });
 
             modelBuilder.Entity("SmartBot.Abstractions.Models.Exporter", b =>
@@ -163,6 +189,16 @@ namespace SmartBot.Infrastructure.Migrations
                     b.HasOne("SmartBot.Abstractions.Models.Report", null)
                         .WithMany()
                         .HasForeignKey("ReviewingReportId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SmartBot.Abstractions.Models.WorkingChat", null)
+                        .WithMany()
+                        .HasForeignKey("SelectedWorkingChatId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SmartBot.Abstractions.Models.WorkingChat", null)
+                        .WithMany()
+                        .HasForeignKey("WorkingChatId")
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 

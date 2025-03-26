@@ -1,11 +1,13 @@
 ﻿using MediatR;
-using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
+using SmartBot.Services.Extensions;
+using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace SmartBot.Services.CommandHandlers;
 
@@ -14,17 +16,16 @@ namespace SmartBot.Services.CommandHandlers;
 /// </summary>
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
-/// <param name="logger">Логгер.</param>
-public class GoBackCommandHandler(ITelegramBotClient client, IUnitOfWork unitOfWork,
-    ILogger<GoBackCommandHandler> logger)
+public class GoBackCommandHandler(ITelegramBotClient client, IUnitOfWork unitOfWork)
     : IRequestHandler<GoBackCommand>
 {
     /// <summary>
-    /// Сообщение, которое отправляется, если пользователь не является проверяющим.
+    /// Приветственное сообщение административной панели
     /// </summary>
-    private const string NotExaminerMessage =
-        "<b>❌ Ошибка:</b> Вы не являетесь проверяющим. Только проверяющие могут использовать эту команду.";
-
+    private const string AdminPanelMessage =
+        "<b>⚙️ Панель управления администратора</b>\n\n" +
+        "Выберите действие из меню ниже:";
+    
     /// <summary>
     /// Обрабатывает команду возврата в состояние Idle.
     /// </summary>
@@ -32,49 +33,59 @@ public class GoBackCommandHandler(ITelegramBotClient client, IUnitOfWork unitOfW
     /// <param name="cancellationToken">Токен отмены операции.</param>
     public async Task Handle(GoBackCommand request, CancellationToken cancellationToken)
     {
-        // Проверяем, является ли пользователь проверяющим
-        if (!request.User!.IsExaminer)
-        {
-            // Устанавливаем проверяющему состояние AwaitingReportInput
-            request.User.State = State.AwaitingReportInput;
-
-            // Сохраняем изменения в базе данных
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            
-            // Отправляем сообщение о том, что пользователь не является проверяющим
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: NotExaminerMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
+        // Проверяем, является ли пользователь администратором
+        if (!await request.CheckAdminAsync(client, cancellationToken)) return;
 
         // Устанавливаем состояние пользователя на Idle
-        request.User.State = State.Idle;
+        request.User!.State = State.Idle;
 
         // Сбрасываем ID проверяемого отчёта
         request.User.ReviewingReportId = null;
+        
+        // Сбрасываем ID проверяемого чата
+        request.User.SelectedWorkingChatId = null;
 
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        // Удаляем сообщение, которое инициировало команду
+        
         try
         {
-            await client.DeleteMessage(
+            // Изменяем сообщение с основным меню администратора
+            await client.EditMessageText(
                 chatId: request.ChatId,
                 messageId: request.MessageId,
-                cancellationToken: cancellationToken
+                text: AdminPanelMessage,
+                parseMode: ParseMode.Html,
+                replyMarkup: AdminKeyboard.MainKeyboard,
+                cancellationToken: CancellationToken.None
             );
         }
-        catch (ApiRequestException ex)
+        catch (ApiRequestException)
         {
-            // Логируем ошибку, если не удалось удалить сообщение
-            logger.LogWarning(ex, "The message with the ID {messageId} could not be deleted.", request.MessageId);
+            // Если редактирование не удалось, отправляем новое сообщение
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: AdminPanelMessage,
+                parseMode: ParseMode.Html,
+                replyMarkup: AdminKeyboard.MainKeyboard,
+                cancellationToken: CancellationToken.None
+            );
         }
+        
+        // Отправляем сообщение с ReplyKeyboardRemove, чтобы убрать клавиатуру
+        var message = await client.SendMessage(
+            chatId: request.ChatId,
+            text: "<i>Убираю клавиатуру...</i>",
+            parseMode: ParseMode.Html,
+            replyMarkup: new ReplyKeyboardRemove(),
+            cancellationToken: CancellationToken.None
+        );
+
+        // Удаляем служебное сообщение, которое убрало клавиатуру
+        await client.DeleteMessage(
+            chatId: request.ChatId,
+            messageId: message.MessageId,
+            cancellationToken: CancellationToken.None
+        );
     }
 }

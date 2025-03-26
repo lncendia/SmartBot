@@ -1,7 +1,7 @@
 ﻿using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Services.Keyboards.ExaminerKeyboard;
+using SmartBot.Services.Keyboards;
 using Telegram.Bot.Types;
 using IRequest = MediatR.IRequest;
 using User = SmartBot.Abstractions.Models.User;
@@ -29,11 +29,11 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
         }
 
         // Если пользователь находится в состоянии Idle и данные начинаются с префикса ExamReportCallbackData
-        if (user.State == State.Idle && query.Data.StartsWith(ExamKeyboard.ExamReportCallbackData))
+        if (user.State == State.Idle && query.Data.StartsWith(AdminKeyboard.ExamReportCallbackData))
         {
             // Извлекаем ID отчёта из данных callback-запроса
             var range = new Range(
-                new Index(ExamKeyboard.ExamReportCallbackData.Length), 
+                new Index(AdminKeyboard.ExamReportCallbackData.Length),
                 new Index(query.Data.Length)
             );
 
@@ -47,7 +47,8 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                     MessageId = query.Message!.Id,
                     TelegramUserId = query.From.Id,
                     User = user,
-                    ReportId = reportId
+                    ReportId = reportId,
+                    CallbackQueryId = query.Id
                 };
             }
 
@@ -55,8 +56,192 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
             return null;
         }
 
-        // Если пользователь находится в состоянии AwaitingCommentInput и данные соответствуют GoBackCallbackData
-        if (user.State is State.AwaitingCommentInput or State.AwaitingExaminerIdForAdding or State.AwaitingExaminerIdForRemoval or State.AwaitingUserIdForRemoval && query.Data == ExamKeyboard.GoBackCallbackData)
+        // Если пользователь находится в состоянии Idle и данные начинаются с префикса DeleteChatCallbackData
+        if (user.State == State.Idle && query.Data.StartsWith(AdminKeyboard.DeleteChatCallbackData))
+        {
+            // Извлекаем ID отчёта из данных callback-запроса
+            var range = new Range(
+                new Index(AdminKeyboard.DeleteChatCallbackData.Length),
+                new Index(query.Data.Length)
+            );
+
+            // Пытаемся преобразовать извлечённую строку в long
+            if (long.TryParse(query.Data[range], out var chatId))
+            {
+                // Если данные соответствуют DeleteChatCallbackData, возвращаем команду для удаления рабочего чата
+                return new RemoveWorkingChatCommand
+                {
+                    ChatId = query.From.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    WorkingChatId = chatId,
+                    CallbackQueryId = query.Id,
+                    MessageId = query.Message!.Id
+                };
+            }
+
+            // Если преобразование не удалось, возвращаем null
+            return null;
+        }
+
+        // Если пользователь находится в состоянии Idle и данные начинаются с префикса SelectChatCallbackData
+        if (user.State == State.Idle && query.Data.StartsWith(AdminKeyboard.SelectChatCallbackData))
+        {
+            // Получаем данные из команды
+            var data = query.Data.Split('_');
+
+            // Если число данных удовлетворяет параметрам команды StartSelectUserForWorkingChatCommand
+            if (data.Length == 2)
+            {
+                // Пытаемся преобразовать извлечённую строку в long
+                if (!long.TryParse(data[1], out var chatId)) return null;
+
+                // Если данные соответствуют SelectChatCallbackData, возвращаем команду начала выбора пользователя для установки рабочего чата
+                return new StartSelectUserForWorkingChatCommand
+                {
+                    ChatId = query.From.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    WorkingChatId = chatId,
+                    CallbackQueryId = query.Id,
+                    MessageId = query.Message!.Id
+                };
+            }
+
+            // Если число данных удовлетворяет параметрам команды SetWorkingChatCommand
+            if (data.Length == 3)
+            {
+                // Пытаемся преобразовать извлечённую строку в long
+                if (!long.TryParse(data[1], out var userId)) return null;
+
+                // Пытаемся преобразовать извлечённую строку в long
+                if (!long.TryParse(data[2], out var chatId)) return null;
+
+                // Если данные соответствуют SelectChatCallbackData, возвращаем команду для удаления рабочего чата
+                return new SetWorkingChatCommand
+                {
+                    ChatId = query.From.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    WorkingChatId = chatId,
+                    UserId = userId,
+                    CallbackQueryId = query.Id,
+                    MessageId = query.Message!.Id
+                };
+            }
+
+            // Если число данных не удовлетворяет параметрам команд, возвращаем null
+            return null;
+        }
+        
+        // Если пользователь находится в состоянии Idle и данные начинаются с префикса SelectRegularAdminCallbackData
+        if (user.State == State.Idle && query.Data.StartsWith(AdminKeyboard.SelectAdminCallbackData))
+        {
+            // Получаем флаг необходимости добавления администратора как теле-администратора
+            var teleAdmin = query.Data == AdminKeyboard.SelectTeleAdminCallbackData;
+            
+            // Если данные соответствуют SelectAdminCallbackData, возвращаем команду для добавления администратора
+            return new StartSelectUserForAssignAdminCommand
+            {
+                ChatId = query.From.Id,
+                TelegramUserId = query.From.Id,
+                User = user,
+                CallbackQueryId = query.Id,
+                MessageId = query.Message!.Id,
+                TeleAdmin = teleAdmin
+            };
+        }
+
+        // Если пользователь находится в состоянии Idle и запрошена команда AddWorkingChatCallbackData
+        if (user.State == State.Idle && query.Data == AdminKeyboard.AddWorkingChatCallbackData)
+        {
+            // Если данные соответствуют AddWorkingChatCallbackData, возвращаем команду для добавления рабочего чата
+            return new StartAddWorkingChatCommand
+            {
+                ChatId = query.From.Id,
+                TelegramUserId = query.From.Id,
+                User = user,
+                CallbackQueryId = query.Id,
+                MessageId = query.Message!.Id
+            };
+        }
+
+        // Если пользователь находится в состоянии Idle и запрошена команда RemoveWorkingChatCallbackData
+        if (user.State == State.Idle && query.Data == AdminKeyboard.RemoveWorkingChatCallbackData)
+        {
+            // Если данные соответствуют RemoveWorkingChatCallbackData, возвращаем команду для добавления рабочего чата
+            return new StartRemoveWorkingChatCommand
+            {
+                ChatId = query.From.Id,
+                TelegramUserId = query.From.Id,
+                User = user,
+                CallbackQueryId = query.Id,
+                MessageId = query.Message!.Id
+            };
+        }
+
+        // Если пользователь находится в состоянии Idle и запрошена команда AssignAdminCallbackData
+        if (user.State == State.Idle && query.Data == AdminKeyboard.AssignAdminCallbackData)
+        {
+            // Если данные соответствуют AssignAdminCallbackData, возвращаем команду для добавления рабочего чата
+            return new StartAssignAdminCommand
+            {
+                ChatId = query.From.Id,
+                TelegramUserId = query.From.Id,
+                User = user,
+                CallbackQueryId = query.Id,
+                MessageId = query.Message!.Id
+            };
+        }
+
+        // Если пользователь находится в состоянии Idle и запрошена команда DemoteAdminCallbackData
+        if (user.State == State.Idle && query.Data == AdminKeyboard.DemoteAdminCallbackData)
+        {
+            // Если данные соответствуют DemoteAdminCallbackData, возвращаем команду для добавления рабочего чата
+            return new StartDemoteAdminCommand
+            {
+                ChatId = query.From.Id,
+                TelegramUserId = query.From.Id,
+                User = user,
+                CallbackQueryId = query.Id,
+                MessageId = query.Message!.Id
+            };
+        }
+
+        // Если пользователь находится в состоянии Idle и запрошена команда BlockUserCallbackData
+        if (user.State == State.Idle && query.Data == AdminKeyboard.BlockUserCallbackData)
+        {
+            // Если данные соответствуют BlockUserCallbackData, возвращаем команду для добавления рабочего чата
+            return new StartBlockUserCommand
+            {
+                ChatId = query.From.Id,
+                TelegramUserId = query.From.Id,
+                User = user,
+                CallbackQueryId = query.Id,
+                MessageId = query.Message!.Id
+            };
+        }
+
+        // Если пользователь находится в состоянии Idle и запрошена команда SetWorkingChatCallbackData
+        if (user.State == State.Idle && query.Data == AdminKeyboard.SetWorkingChatCallbackData)
+        {
+            // Если данные соответствуют AddWorkingChatCallbackData, возвращаем команду для добавления рабочего чата
+            return new StartSetWorkingChatCommand
+            {
+                ChatId = query.From.Id,
+                TelegramUserId = query.From.Id,
+                User = user,
+                CallbackQueryId = query.Id,
+                MessageId = query.Message!.Id
+            };
+        }
+
+        // Если пользователь находится в состоянии, позволяющем вернуться назад и данные соответствуют GoBackCallbackData
+        if (user.State is State.AwaitingCommentInput or State.AwaitingAdminIdForAdding
+                or State.AwaitingTeleAdminIdForAdding or State.AwaitingAdminIdForRemoval
+                or State.AwaitingUserIdForBlock or State.AwaitingWorkingChatForAdding
+                or State.Idle or State.AwaitingUserIdForSetWorkingChat
+            && query.Data == AdminKeyboard.AdminGoBackCallbackData)
         {
             // Возвращаем команду для возврата в состояние Idle
             return new GoBackCommand
@@ -65,6 +250,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 MessageId = query.Message!.Id,
                 TelegramUserId = query.From.Id,
                 User = user,
+                CallbackQueryId = query.Id
             };
         }
 

@@ -2,6 +2,7 @@
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using IRequest = MediatR.IRequest;
 using User = SmartBot.Abstractions.Models.User;
 
@@ -33,7 +34,7 @@ public class MessageCommandFactory : IMessageCommandFactory
 
         // Проверяем состояние пользователя и возвращаем соответствующую команду
 
-        // Если пользователь ожидает ввода ФИО
+        // Если бот ожидает ввода ФИО
         if (user.State == State.AwaitingFullNameInput)
         {
             // Возвращаем команду для установки ФИО
@@ -46,7 +47,7 @@ public class MessageCommandFactory : IMessageCommandFactory
             };
         }
 
-        // Если пользователь ожидает ввода должности
+        // Если бот ожидает ввода должности
         if (user.State == State.AwaitingPositionInput)
         {
             // Возвращаем команду для установки должности
@@ -59,7 +60,7 @@ public class MessageCommandFactory : IMessageCommandFactory
             };
         }
 
-        // Если пользователь ожидает ввода отчёта
+        // Если бот ожидает ввода отчёта
         if (user.State == State.AwaitingReportInput)
         {
             // Возвращаем команду для анализа отчёта
@@ -68,11 +69,11 @@ public class MessageCommandFactory : IMessageCommandFactory
                 ChatId = message.Chat,
                 TelegramUserId = message.From!.Id,
                 User = user,
-                Report = message.Text,
+                Report = message.Text
             };
         }
 
-        // Если пользователь ожидает ввода комментария
+        // Если бот ожидает ввода комментария
         if (user.State == State.AwaitingCommentInput)
         {
             // Возвращаем команду для добавления комментария
@@ -81,48 +82,114 @@ public class MessageCommandFactory : IMessageCommandFactory
                 ChatId = message.Chat,
                 TelegramUserId = message.From!.Id,
                 User = user,
-                Comment = message.Text,
+                Comment = message.Text
             };
         }
 
-        // Если пользователь ожидает ввода ID нового проверяющего
-        if (user.State == State.AwaitingExaminerIdForAdding)
+        // Если бот ожидает ввода ID нового администратора
+        if (user.State is State.AwaitingAdminIdForAdding or State.AwaitingTeleAdminIdForAdding &&
+            message.Type == MessageType.UsersShared)
         {
-            // Возвращаем команду для добавления проверяющего
-            return new AddExaminerCommand
+            // Получаем идентификатор пользователя
+            var userId = message.UsersShared?.Users.FirstOrDefault()?.UserId;
+
+            // Если идентификатор не удалось получить - не выполняем команду
+            if (userId == null) return null;
+
+            // Получаем флаг необходимости добавления администратора как теле-администратора
+            var teleAdmin = user.State == State.AwaitingTeleAdminIdForAdding;
+            
+            // Возвращаем команду для добавления администратора
+            return new AssignAdminCommand
             {
                 ChatId = message.Chat,
                 TelegramUserId = message.From!.Id,
                 User = user,
-                ExaminerId = message.Text
+                AdminId = userId.Value,
+                TeleAdmin = teleAdmin
             };
         }
 
-        // Если пользователь ожидает ввода ID проверяющего для удаления
-        if (user.State == State.AwaitingExaminerIdForRemoval)
+        // Если бот ожидает ввода ID администратора для удаления
+        if (user.State == State.AwaitingAdminIdForRemoval && message.Type == MessageType.UsersShared)
         {
-            // Возвращаем команду для удаления проверяющего
-            return new RemoveExaminerCommand
+            // Получаем идентификатор пользователя
+            var userId = message.UsersShared?.Users.FirstOrDefault()?.UserId;
+
+            // Если идентификатор не удалось получить - не выполняем команду
+            if (userId == null) return null;
+
+            // Возвращаем команду для удаления администратора
+            return new DemoteAdminCommand
             {
                 ChatId = message.Chat,
                 TelegramUserId = message.From!.Id,
                 User = user,
-                ExaminerId = message.Text
+                AdminId = userId.Value
             };
         }
 
-        // Если пользователь ожидает ввода ID пользователя для удаления
-        if (user.State == State.AwaitingUserIdForRemoval)
+        // Если бот ожидает ввода ID пользователя для установки рабочего чата
+        if (user.State == State.AwaitingUserIdForSetWorkingChat && message.Type == MessageType.UsersShared)
         {
+            // Получаем идентификатор пользователя
+            var userId = message.UsersShared?.Users.FirstOrDefault()?.UserId;
+
+            // Если идентификатор не удалось получить - не выполняем команду
+            if (userId == null) return null;
+
+            // Возвращаем команду для установки рабочего чата
+            return new SetWorkingChatFromSelectedCommand
+            {
+                ChatId = message.Chat,
+                TelegramUserId = message.From!.Id,
+                User = user,
+                UserId = userId.Value
+            };
+        }
+
+        // Если бот ожидает ввода ID пользователя для удаления
+        if (user.State == State.AwaitingUserIdForBlock && message.Type == MessageType.UsersShared)
+        {
+            // Получаем идентификатор пользователя
+            var userId = message.UsersShared?.Users.FirstOrDefault()?.UserId;
+
+            // Если идентификатор не удалось получить - не выполняем команду
+            if (userId == null) return null;
+
             // Возвращаем команду для удаления пользователя
-            return new RemoveUserCommand
+            return new BlockUserCommand
             {
                 ChatId = message.Chat,
                 TelegramUserId = message.From!.Id,
                 User = user,
-                UserId = message.Text
+                UserId = userId.Value
             };
         }
+
+        // Если бот ожидает ввода ID пользователя для удаления
+        if (user.State == State.AwaitingWorkingChatForAdding && message.Type == MessageType.ChatShared)
+        {
+            // Получаем идентификатор чата
+            var chatId = message.ChatShared?.ChatId;
+
+            // Получаем имя чата
+            var title = message.ChatShared?.Title;
+
+            // Если идентификатор или имя не удалось получить - не выполняем команду
+            if (chatId == null || title == null) return null;
+
+            // Возвращаем команду для удаления пользователя
+            return new AddWorkingChatCommand
+            {
+                ChatId = message.Chat,
+                TelegramUserId = message.From!.Id,
+                User = user,
+                WorkingChatId = chatId.Value,
+                WorkingChatName = title
+            };
+        }
+
 
         // Если пользователь находится в состоянии Idle (ожидания команд)
         if (user.State == State.Idle)
@@ -130,28 +197,12 @@ public class MessageCommandFactory : IMessageCommandFactory
             // Возвращаем команду в зависимости от текста сообщения
             return message.Text switch
             {
-                // Если текст сообщения "/block", возвращаем команду для начала удаления пользователя
-                "/block" => new StartRemoveUserCommand
+                // Если текст сообщения "/admin", возвращаем команду для входа в панель администратора
+                "/admin" => new AdminCommand
                 {
                     ChatId = message.Chat,
-                    TelegramUserId = message.From!.Id,
                     User = user,
-                },
-
-                // Если текст сообщения "/examineradd", возвращаем команду для начала добавления проверяющего
-                "/examineradd" => new StartAddExaminerCommand
-                {
-                    ChatId = message.Chat,
-                    TelegramUserId = message.From!.Id,
-                    User = user,
-                },
-
-                // Если текст сообщения "/examinerremove", возвращаем команду для начала удаления проверяющего
-                "/examinerremove" => new StartRemoveExaminerCommand
-                {
-                    ChatId = message.Chat,
-                    TelegramUserId = message.From!.Id,
-                    User = user,
+                    TelegramUserId = message.From!.Id
                 },
 
                 // Если текст сообщения не соответствует ни одной команде, возвращаем null

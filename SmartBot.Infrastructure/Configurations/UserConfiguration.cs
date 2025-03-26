@@ -23,11 +23,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         // Устанавливаем ограничения для свойства FullName
         builder.Property(u => u.FullName)
-            .HasMaxLength(150); // Максимальная длина 100 символов
+            .HasMaxLength(150); // Максимальная длина 150 символов
 
         // Устанавливаем ограничения для свойства Position
         builder.Property(u => u.Position)
-            .HasMaxLength(100); // Максимальная длина 50 символов
+            .HasMaxLength(50); // Максимальная длина 50 символов
 
         // Настраиваем связь one-to-many с сущностью Report
         builder.HasMany(u => u.Reports) // У пользователя может быть много отчётов
@@ -37,8 +37,20 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         // Настраиваем связь many-to-one с сущностью Report
         builder.HasOne<Report>() // У пользователя может быть только один отчёт на проверке
-            .WithMany() // У отчёта может быть много проверяющих
+            .WithMany() // У отчёта может быть много администраторов
             .HasForeignKey(u => u.ReviewingReportId) // Внешний ключ в User
+            .OnDelete(DeleteBehavior.SetNull); // Установка внешнего ключа в null при удалении отчёта
+        
+        // Настраиваем связь many-to-one с сущностью WorkingChat
+        builder.HasOne<WorkingChat>() // У пользователя может быть только один рабочий чат
+            .WithMany() // У рабочего чата может быть много пользователей
+            .HasForeignKey(u => u.WorkingChatId) // Внешний ключ в User
+            .OnDelete(DeleteBehavior.SetNull); // Установка внешнего ключа в null при удалении отчёта
+        
+        // Настраиваем связь many-to-one с сущностью WorkingChat
+        builder.HasOne<WorkingChat>() // У пользователя может быть только один рабочий чат
+            .WithMany() // У рабочего чата может быть много пользователей
+            .HasForeignKey(u => u.SelectedWorkingChatId) // Внешний ключ в User
             .OnDelete(DeleteBehavior.SetNull); // Установка внешнего ключа в null при удалении отчёта
     }
 }

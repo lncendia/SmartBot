@@ -2,11 +2,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
+using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
 using SmartBot.Abstractions.Models;
-using SmartBot.Services.Keyboards.ExaminerKeyboard;
+using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
@@ -21,11 +22,13 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="reportAnalyzer">Анализатор отчётов.</param>
 /// <param name="dateTimeProvider">Провайдер для работы с текущим временем.</param>
 /// <param name="logger">Логгер.</param>
+/// <param name="options">Настройки параллелизма для рассылки сообщений.</param>
 public class AnalyzeReportCommandHandler(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
     IReportAnalyzer reportAnalyzer,
     IDateTimeProvider dateTimeProvider,
+    ParallelOptions options,
     ILogger<AnalyzeReportCommandHandler> logger)
     : IRequestHandler<AnalyzeReportCommand>
 {
@@ -96,7 +99,7 @@ public class AnalyzeReportCommandHandler(
         "Я отправлю вам уведомление, когда наступит время для отправки отчёта. 🛎";
 
     /// <summary>
-    /// Сообщение для проверяющего о новом отчёте пользователя.
+    /// Сообщение для администратора о новом отчёте пользователя.
     /// Содержит имя пользователя и текст отчёта, а также приглашение оставить комментарий.
     /// </summary>
     private const string ReportSubmissionMessage =
@@ -104,17 +107,19 @@ public class AnalyzeReportCommandHandler(
         "👇 <b>Текст отчёта:</b>\n" +
         "<blockquote>{1}</blockquote>\n\n" +
         "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
-    
+
     /// <summary>
     /// Шаблон сообщения о просрочке утреннего отчёта.
     /// </summary>
-    private const string MorningOverdueMessage = "⚠️ Вы просрочили утренний отчёт на {0}. Постарайтесь не задерживать отчёты в будущем!";
+    private const string MorningOverdueMessage =
+        "⚠️ Вы просрочили утренний отчёт на {0}. Постарайтесь не задерживать отчёты в будущем!";
 
     /// <summary>
     /// Шаблон сообщения о просрочке вечернего отчёта.
     /// </summary>
-    private const string EveningOverdueMessage = "⚠️ Вы просрочили вечерний отчёт на {0}. Постарайтесь не задерживать отчёты в будущем!";
-    
+    private const string EveningOverdueMessage =
+        "⚠️ Вы просрочили вечерний отчёт на {0}. Постарайтесь не задерживать отчёты в будущем!";
+
     /// <summary>
     /// Шаблон сообщения о необходимости сдать вечерний отчёт.
     /// </summary>
@@ -123,11 +128,6 @@ public class AnalyzeReportCommandHandler(
         "Пожалуйста, отправьте ваш <b>вечерний отчёт</b> как можно скорее. " +
         "Это важно для подведения итогов дня и планирования завтрашних задач.\n\n" +
         "📝 <i>Не забудьте указать ключевые результаты и планы на завтра.</i>";
-
-    /// <summary>
-    /// Параметры параллельного выполнения.
-    /// </summary>
-    private readonly ParallelOptions _parallelOptions = new() { MaxDegreeOfParallelism = 3 };
 
     /// <summary>
     /// Обрабатывает команду анализа отчёта.
@@ -313,7 +313,8 @@ public class AnalyzeReportCommandHandler(
             if (report.MorningReport.Overdue.HasValue)
             {
                 // Формируем сообщение о просрочке.
-                var overdueMessage = string.Format(MorningOverdueMessage, report.MorningReport.Overdue.FormatTimeSpan());
+                var overdueMessage =
+                    string.Format(MorningOverdueMessage, report.MorningReport.Overdue.FormatTimeSpan());
 
                 // Отправляем сообщение о просрочке.
                 await client.SendMessage(
@@ -350,7 +351,8 @@ public class AnalyzeReportCommandHandler(
             if (report.EveningReport.Overdue.HasValue)
             {
                 // Формируем сообщение о просрочке.
-                var overdueMessage = string.Format(EveningOverdueMessage, report.EveningReport.Overdue.FormatTimeSpan());
+                var overdueMessage =
+                    string.Format(EveningOverdueMessage, report.EveningReport.Overdue.FormatTimeSpan());
 
                 // Отправляем сообщение о просрочке.
                 await client.SendMessage(
@@ -362,32 +364,34 @@ public class AnalyzeReportCommandHandler(
             }
         }
 
-        // Получаем список ID проверяющих
-        var examiners = await unitOfWork
+        // Получаем список ID администраторов
+        var admins = await unitOfWork
             .Query<User>()
-            .Where(u => u.IsExaminer)
+            .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
             .Select(u => u.Id)
             .ToListAsync(CancellationToken.None);
 
-        // Параллельно отправляем уведомления каждому проверяющему
-        await Parallel.ForEachAsync(examiners, _parallelOptions, async (userId, ct) =>
+        // Если у пользователя установлен рабочий чат - добавляем его в список чатов рассылки
+        if (request.User!.WorkingChatId.HasValue) admins.Add(request.User!.WorkingChatId.Value);
+
+        // Параллельно отправляем уведомления каждому администратору
+        await Parallel.ForEachAsync(admins, options, async (chatId, ct) =>
         {
             try
             {
-                // Отправляем сообщение проверяющему.
+                // Отправляем сообщение администратору.
                 await client.SendMessage(
-                    chatId: userId,
-                    text: string.Format(ReportSubmissionMessage, request.User?.FullName ?? string.Empty,
-                        request.Report),
+                    chatId: chatId,
+                    text: string.Format(ReportSubmissionMessage, request.User?.FullName, request.Report),
                     parseMode: ParseMode.Html,
-                    replyMarkup: ExamKeyboard.ExamReportKeyboard(report.Id),
+                    replyMarkup: AdminKeyboard.ExamReportKeyboard(report.Id),
                     cancellationToken: ct
                 );
             }
             catch (ApiRequestException ex) // Ловим только ошибки Telegram API
             {
                 // Логируем ошибку, если не удалось отправить сообщение.
-                logger.LogWarning(ex, "Failed to send report submission notification to user {UserId}.", userId);
+                logger.LogWarning(ex, "Failed to send report submission notification to chat {ChatId}.", chatId);
             }
         });
     }

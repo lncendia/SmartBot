@@ -58,16 +58,16 @@ public class SetFullNameCommandHandler(ITelegramBotClient client, IUnitOfWork un
 
         // Устанавливаем новое состояние пользователю
         request.User.State = State.AwaitingPositionInput;
-
+        
+        // Сохраняем изменения в базе данных
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        
         // Отправляем сообщение об успешной установке ФИО
         await client.SendMessage(
             chatId: request.ChatId,
             text: SuccessMessage,
-            cancellationToken: cancellationToken
+            cancellationToken: CancellationToken.None
         );
-        
-        // Сохраняем изменения в базе данных
-        await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

@@ -31,22 +31,32 @@ public enum State
     AwaitingCommentInput,
 
     /// <summary>
+    /// 
+    /// </summary>
+    AwaitingWorkingChatForAdding,
+
+    /// <summary>
     /// Ожидает ввода идентификатора администратора для добавления.
     /// </summary>
-    AwaitingExaminerIdForAdding,
+    AwaitingAdminIdForAdding,
+    
+    /// <summary>
+    /// Ожидает ввода идентификатора теле-администратора для добавления.
+    /// </summary>
+    AwaitingTeleAdminIdForAdding,
 
     /// <summary>
     /// Ожидает ввода идентификатора администратора для удаления.
     /// </summary>
-    AwaitingExaminerIdForRemoval,
+    AwaitingAdminIdForRemoval,
     
     /// <summary>
     /// Ожидает ввода идентификатора пользователя для удаления.
     /// </summary>
-    AwaitingUserIdForRemoval,
+    AwaitingUserIdForBlock,
     
     /// <summary>
-    /// Заблокирован.
+    /// Ожидает ввода идентификатора пользователя для установки рабочего чата.
     /// </summary>
-    Blocked
+    AwaitingUserIdForSetWorkingChat,
 }
