@@ -1,4 +1,4 @@
-﻿namespace SmartBot.Abstractions.Models;
+﻿namespace SmartBot.Abstractions.Models.Reports;
 
 /// <summary>
 /// Класс, представляющий отчёт пользователя (утренний или вечерний).

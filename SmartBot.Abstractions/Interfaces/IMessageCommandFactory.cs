@@ -1,6 +1,6 @@
 using Telegram.Bot.Types;
 using IRequest = MediatR.IRequest;
-using User = SmartBot.Abstractions.Models.User;
+using User = SmartBot.Abstractions.Models.Users.User;
 
 namespace SmartBot.Abstractions.Interfaces;
 

@@ -3,6 +3,6 @@
 namespace SmartBot.Abstractions.Commands;
 
 /// <summary>
-/// Команда для возврата в состояние Idle (отмена текущего действия).
+/// Команда для отображения административной панели управления
 /// </summary>
 public class AdminCommand : TelegramCommand;

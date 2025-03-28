@@ -5,7 +5,8 @@ using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Users;
+using SmartBot.Abstractions.Models.WorkingChats;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -80,7 +81,7 @@ public class SetPositionCommandHandler(
     /// </summary>
     private const string NewUserNotificationMessage =
         "👤 <b>Новый пользователь</b>\n\n" +
-        "📛 <b>Имя:</b> {0}\n" +
+        "📨 <b>Имя:</b> {0}\n" +
         "💼 <b>Должность:</b> {1}\n\n" +
         "Выберите рабочий чат для него или проигнорируйте это сообщение.";
 

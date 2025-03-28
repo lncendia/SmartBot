@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.WorkingChats;
 using SmartBot.Services.Extensions;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;

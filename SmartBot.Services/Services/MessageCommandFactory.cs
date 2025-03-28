@@ -4,7 +4,7 @@ using SmartBot.Abstractions.Interfaces;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using IRequest = MediatR.IRequest;
-using User = SmartBot.Abstractions.Models.User;
+using User = SmartBot.Abstractions.Models.Users.User;
 
 namespace SmartBot.Services.Services;
 
@@ -32,8 +32,18 @@ public class MessageCommandFactory : IMessageCommandFactory
             };
         }
 
-        // Проверяем состояние пользователя и возвращаем соответствующую команду
-
+        // Если пользователь запрашивает вход в панель администратора
+        if (user.State is State.Idle or State.AwaitingReportInput && message.Text == "/admin")
+        {
+            // Возвращаем команду входа в панель администратора
+            return new AdminCommand
+            {
+                ChatId = message.Chat,
+                User = user,
+                TelegramUserId = message.From!.Id
+            };
+        }
+        
         // Если бот ожидает ввода ФИО
         if (user.State == State.AwaitingFullNameInput)
         {
@@ -83,6 +93,19 @@ public class MessageCommandFactory : IMessageCommandFactory
                 TelegramUserId = message.From!.Id,
                 User = user,
                 Comment = message.Text
+            };
+        }
+        
+        // Если бот ожидает ввода ответа на комментарий
+        if (user.State == State.AwaitingAnswerInput)
+        {
+            // Возвращаем команду для ответа на комментарий
+            return new AnswerCommand
+            {
+                ChatId = message.Chat,
+                TelegramUserId = message.From!.Id,
+                User = user,
+                Message = message.Text
             };
         }
 
@@ -168,7 +191,7 @@ public class MessageCommandFactory : IMessageCommandFactory
         }
 
         // Если бот ожидает ввода ID пользователя для удаления
-        if (user.State == State.AwaitingWorkingChatForAdding && message.Type == MessageType.ChatShared)
+        if (user.State == State.AwaitingWorkingChatIdForAdding && message.Type == MessageType.ChatShared)
         {
             // Получаем идентификатор чата
             var chatId = message.ChatShared?.ChatId;
@@ -187,26 +210,6 @@ public class MessageCommandFactory : IMessageCommandFactory
                 User = user,
                 WorkingChatId = chatId.Value,
                 WorkingChatName = title
-            };
-        }
-
-
-        // Если пользователь находится в состоянии Idle (ожидания команд)
-        if (user.State == State.Idle)
-        {
-            // Возвращаем команду в зависимости от текста сообщения
-            return message.Text switch
-            {
-                // Если текст сообщения "/admin", возвращаем команду для входа в панель администратора
-                "/admin" => new AdminCommand
-                {
-                    ChatId = message.Chat,
-                    User = user,
-                    TelegramUserId = message.From!.Id
-                },
-
-                // Если текст сообщения не соответствует ни одной команде, возвращаем null
-                _ => null
             };
         }
 

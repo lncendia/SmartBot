@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using SmartBot.Abstractions.Configuration;
 using SmartBot.Abstractions.Interfaces.DataExporter;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
 using SmartBot.HostedServices;
@@ -8,94 +9,107 @@ using SmartBot.Infrastructure.Services.ReportAnalyzer;
 namespace SmartBot.Extensions;
 
 /// <summary>
-/// Статический класс сервисов анализа отчетов.
+/// Статический класс для регистрации сервисов работы с отчетами
 /// </summary>
 public static class ReportsServices
 {
     /// <summary>
-    /// Добавляет сервисы анализа отчетов.
+    /// Добавляет сервисы для работы с отчетами в DI-контейнер
     /// </summary>
-    /// <param name="services">Коллекция служб, в которую будут добавлены новые сервисы.</param>
-    /// <param name="configuration">Конфигурация приложения, содержащая параметры подключения и пути к хранилищам.</param>
+    /// <param name="services">Коллекция сервисов</param>
+    /// <param name="configuration">Конфигурация приложения</param>
     public static void AddReportsServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // Получаем токен для OpenRouter
+        // Получаем API-токен для сервиса OpenRouter из конфигурации
         var token = configuration.GetRequiredValue<string>("Openrouter:Token");
 
-        // Создаем конфигурацию для анализатора
+        // Создаем конфигурацию для анализатора отчетов
         var analyzerConfiguration = new AnalyzerConfiguration
         {
-            // Получаем prompt для анализатора
+            // Получаем промпт для анализа отчетов из конфигурации
             Prompt = configuration.GetRequiredValue<string>("Openrouter:Prompt"),
 
-            // Получаем модель для анализатора
+            // Получаем название модели ИИ из конфигурации
             Model = configuration.GetRequiredValue<string>("Openrouter:Model"),
         };
 
-        // Получаем путь к файлу с учетными данными Google
+        // Создаем конфигурацию для анализа отчетов
+        var analysisConfiguration = new ReportAnalysisConfiguration
+        {
+            // Получаем флаг включения анализа отчетов из конфигурации
+            Enabled = configuration.GetRequiredValue<bool>("ReportAnalysis:Enabled"),
+          
+            // Получаем минимальный проходной балл для отчетов из конфигурации
+            MinScore = configuration.GetRequiredValue<int>("ReportAnalysis:MinScore"),
+        };
+
+        // Получаем путь к файлу с учетными данными Google из конфигурации
         var googleCredentialsPath = configuration.GetRequiredValue<string>("Exporting:GoogleCredentialsPath");
 
-        // Считываем содержимое файла с учетными данными Google
+        // Читаем содержимое файла с учетными данными Google
         var googleCredentials = File.ReadAllText(googleCredentialsPath);
 
-        // Создаем конфигурацию для Google Sheets
+        // Создаем конфигурацию для работы с Google Sheets
         var googleSheetsConfiguration = new GoogleSheetsConfiguration
         {
-            // Устанавливаем имя приложения
+            // Устанавливаем название приложения из конфигурации
             ApplicationName = configuration.GetRequiredValue<string>("Exporting:ApplicationName"),
 
-            // Устанавливаем идентификатор листа
+            // Устанавливаем ID листа из конфигурации
             SheetId = configuration.GetRequiredValue<int>("Exporting:SheetId"),
 
-            // Устанавливаем идентификатор таблицы
+            // Устанавливаем ID таблицы из конфигурации
             SpreadsheetId = configuration.GetRequiredValue<string>("Exporting:SpreadsheetId"),
 
             // Устанавливаем учетные данные Google
             CredentialsJson = googleCredentials,
         };
 
-        // Регистрируем конфигурацию Google Sheets как синглтон
+        // Регистрируем конфигурацию Google Sheets как singleton
         services.AddSingleton(googleSheetsConfiguration);
 
-        // Добавляем конфигурацию для анализатора как синглтон
+        // Регистрируем конфигурацию анализатора как singleton
         services.AddSingleton(analyzerConfiguration);
+        
+        // Регистрируем конфигурацию анализа отчетов как singleton
+        services.AddSingleton(analysisConfiguration);
 
-        // Добавляем HTTP-клиент для анализатора отчетов
+        // Добавляем HTTP-клиент для работы с API OpenRouter
         services.AddHttpClient(ReportAnalyzer.HttpClientName, client =>
         {
-            // Устанавливаем базовый адрес
+            // Устанавливаем базовый адрес API
             client.BaseAddress = new Uri("https://openrouter.ai");
 
-            // Устанавливаем заголовки
+            // Устанавливаем заголовок авторизации с токеном
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            // Устанавливаем тип принимаемого контента
+            // Устанавливаем заголовок Accept для JSON
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         });
 
-        // Добавляем сервис анализатора отчетов
+        // Регистрируем основной сервис анализатора отчетов с ключом
         services.AddKeyedSingleton<IReportAnalyzer, ReportAnalyzer>("InnerReportAnalyzer");
 
-        // Добавляем сервис анализатора отчетов с повторными попытками
+        // Регистрируем оберточный сервис анализатора с обработкой ошибок
         services.AddSingleton<IReportAnalyzer, ResilientAnalyzer>(sp =>
         {
-            // Получаем сервис анализатора отчетов
+            // Получаем основной сервис анализатора по ключу
             var reportAnalyzer = sp.GetRequiredKeyedService<IReportAnalyzer>("InnerReportAnalyzer");
 
-            // Получаем логгер
+            // Получаем логгер из DI-контейнера
             var logger = sp.GetRequiredService<ILogger<ResilientAnalyzer>>();
 
-            // Возвращаем новый экземпляр ResilientAnalyzer
+            // Создаем и возвращаем оберточный сервис
             return new ResilientAnalyzer(reportAnalyzer, logger);
         });
 
-        // Добавляем сервис экспортирования данных в Google Sheets
+        // Регистрируем сервис экспорта данных в Google Sheets
         services.AddScoped<IDataExporter, GoogleSheetsExporter>();
 
-        // Добавляем фоновый сервис экспорта отчётов
+        // Регистрируем фоновый сервис для экспорта отчетов
         services.AddHostedService<ExportingHostedService>();
         
-        // Добавляем фоновый сервис отчистки старых отчётов
+        // Регистрируем фоновый сервис для очистки старых отчетов
         services.AddHostedService<ClearingHostedService>();
     }
 }

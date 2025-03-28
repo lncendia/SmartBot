@@ -7,7 +7,7 @@ namespace SmartBot.Services.Extensions;
 /// <summary>
 /// Класс расширений для административных команд Telegram бота
 /// </summary>
-public static class AdminExtensions
+public static class AdminCallbackQueryExtensions
 {
     /// <summary>
     /// Сообщение об ошибке при отсутствии прав администратора

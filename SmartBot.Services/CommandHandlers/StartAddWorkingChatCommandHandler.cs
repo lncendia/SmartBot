@@ -45,7 +45,7 @@ public class StartAddWorkingChatCommandHandler(
         if (!await request.CheckAdminAsync(client, cancellationToken)) return;
 
         // Устанавливаем состояние пользователя на "Ожидание данных чата для добавления"
-        request.User!.State = State.AwaitingWorkingChatForAdding;
+        request.User!.State = State.AwaitingWorkingChatIdForAdding;
 
         // Сохраняем изменения состояния пользователя в базу данных
         await unitOfWork.SaveChangesAsync(cancellationToken);

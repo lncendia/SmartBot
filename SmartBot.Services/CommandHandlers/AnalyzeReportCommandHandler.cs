@@ -2,11 +2,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
+using SmartBot.Abstractions.Configuration;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Reports;
+using SmartBot.Abstractions.Models.Users;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -23,12 +25,14 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="dateTimeProvider">Провайдер для работы с текущим временем.</param>
 /// <param name="logger">Логгер.</param>
 /// <param name="options">Настройки параллелизма для рассылки сообщений.</param>
+/// <param name="analyzerConfiguration">Конфигурация анализатора отчётов.</param>
 public class AnalyzeReportCommandHandler(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
     IReportAnalyzer reportAnalyzer,
     IDateTimeProvider dateTimeProvider,
     ParallelOptions options,
+    ReportAnalysisConfiguration analyzerConfiguration,
     ILogger<AnalyzeReportCommandHandler> logger)
     : IRequestHandler<AnalyzeReportCommand>
 {
@@ -103,9 +107,10 @@ public class AnalyzeReportCommandHandler(
     /// Содержит имя пользователя и текст отчёта, а также приглашение оставить комментарий.
     /// </summary>
     private const string ReportSubmissionMessage =
-        "📄 <b>Новый отчёт от пользователя:</b> <i>{0}</i>\n\n" +
+        "📄 <b>Новый отчёт от пользователя</b> <i>{0}</i>\n" +
+        "🧑‍🏭 <b>Должность:</b> <i>{1}</i>\n\n" +
         "👇 <b>Текст отчёта:</b>\n" +
-        "<blockquote>{1}</blockquote>\n\n" +
+        "<blockquote>{2}</blockquote>\n\n" +
         "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
 
     /// <summary>
@@ -204,53 +209,58 @@ public class AnalyzeReportCommandHandler(
             return;
         }
 
-        // Объявляем переменную для хранения результата анализа отчёта
-        ReportAnalyzeResult analysisResult;
-
-        try
+        // Если анализатор отчётов включен - анализируем отчёт
+        if (analyzerConfiguration.Enabled)
         {
-            // Выполняем асинхронный анализ отчёта с использованием анализатора
-            var task = reportAnalyzer.AnalyzeAsync(request.Report!, cancellationToken);
+            // Объявляем переменную для хранения результата анализа отчёта
+            ReportAnalyzeResult analysisResult;
 
-            // Пока задача не завершена, отправляем статус "печатает" в чат
-            while (!task.IsCompleted)
+            try
             {
-                await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: cancellationToken);
+                // Выполняем асинхронный анализ отчёта с использованием анализатора
+                var task = reportAnalyzer.AnalyzeAsync(request.Report!, cancellationToken);
 
-                // Ждём 2 секунды перед следующей проверкой
-                await Task.Delay(2000, cancellationToken);
+                // Пока задача не завершена, отправляем статус "печатает" в чат
+                while (!task.IsCompleted)
+                {
+                    await client.SendChatAction(request.ChatId, ChatAction.Typing,
+                        cancellationToken: cancellationToken);
+
+                    // Ждём 2 секунды перед следующей проверкой
+                    await Task.Delay(2000, cancellationToken);
+                }
+
+                // Получаем результат анализа
+                analysisResult = task.Result;
+            }
+            catch
+            {
+                // Если произошла ошибка при анализе отчёта, отправляем сообщение об ошибке в чат
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: AnalyzerUnavailableMessage,
+                    parseMode: ParseMode.Html,
+                    cancellationToken: cancellationToken
+                );
+
+                // Не продолжаем
+                return;
             }
 
-            // Получаем результат анализа
-            analysisResult = task.Result;
-        }
-        catch
-        {
-            // Если произошла ошибка при анализе отчёта, отправляем сообщение об ошибке в чат
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: AnalyzerUnavailableMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
+            // Если отчёт некорректен (оценка меньше MinScore), отправляем рекомендации
+            if (analysisResult.Score < analyzerConfiguration.MinScore)
+            {
+                // Отправляем сообщение с рекомендациями по исправлению отчёта
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: string.Format(ErrorMessage, analysisResult.Score, analysisResult.Recommendations),
+                    parseMode: ParseMode.Html,
+                    cancellationToken: cancellationToken
+                );
 
-            // Не продолжаем
-            return;
-        }
-
-        // Если отчёт некорректен (оценка меньше 4), отправляем рекомендации
-        if (analysisResult.Score < 7)
-        {
-            // Отправляем сообщение с рекомендациями по исправлению отчёта
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: string.Format(ErrorMessage, analysisResult.Score, analysisResult.Recommendations),
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
+                // Завершаем выполнение метода
+                return;
+            }
         }
 
         // Получаем текущее время после анализа данных.
@@ -375,16 +385,20 @@ public class AnalyzeReportCommandHandler(
         if (request.User!.WorkingChatId.HasValue) admins.Add(request.User!.WorkingChatId.Value);
 
         // Параллельно отправляем уведомления каждому администратору
-        await Parallel.ForEachAsync(admins, options, async (chatId, ct) =>
+        await Parallel.ForEachAsync(admins.Where(id=>id != request.User.Id), options, async (chatId, ct) =>
         {
             try
             {
                 // Отправляем сообщение администратору.
                 await client.SendMessage(
                     chatId: chatId,
-                    text: string.Format(ReportSubmissionMessage, request.User?.FullName, request.Report),
+                    text: string.Format(
+                        ReportSubmissionMessage, 
+                        request.User?.FullName, 
+                        request.User?.Position,
+                        request.Report),
                     parseMode: ParseMode.Html,
-                    replyMarkup: AdminKeyboard.ExamReportKeyboard(report.Id),
+                    replyMarkup: AdminKeyboard.ExamReportKeyboard(report.Id, report.EveningReport != null),
                     cancellationToken: ct
                 );
             }

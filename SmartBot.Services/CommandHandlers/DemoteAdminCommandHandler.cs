@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Users;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -57,11 +57,11 @@ public class DemoteAdminCommandHandler(
     public async Task Handle(DemoteAdminCommand request, CancellationToken cancellationToken)
     {
         // Получаем пользователя, которого нужно удалить из числа администраторов
-        var examinerToRemove = await unitOfWork.Query<User>()
+        var demotedAdmin = await unitOfWork.Query<User>()
             .FirstOrDefaultAsync(u => u.Id == request.AdminId, cancellationToken);
 
         // Если пользователь не найден
-        if (examinerToRemove == null)
+        if (demotedAdmin == null)
         {
             // Отправляем сообщение о том, что пользователь не найден
             await client.SendMessage(
@@ -77,7 +77,7 @@ public class DemoteAdminCommandHandler(
         }
 
         // Если пользователь не является администратором
-        if (!examinerToRemove.IsAdmin)
+        if (!demotedAdmin.IsAdmin)
         {
             // Отправляем сообщение о том, что пользователь не является администратором
             await client.SendMessage(
@@ -93,11 +93,8 @@ public class DemoteAdminCommandHandler(
         }
 
         // Удаляем пользователя из числа администраторов
-        examinerToRemove.Role = Role.Employee;
-        examinerToRemove.State = State.AwaitingReportInput;
-
-        // Устанавливаем состояние текущего пользователя на Idle
-        request.User!.State = State.Idle;
+        demotedAdmin.Role = Role.Employee;
+        demotedAdmin.State = State.AwaitingReportInput;
 
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -115,7 +112,7 @@ public class DemoteAdminCommandHandler(
         try
         {
             await client.SendMessage(
-                chatId: examinerToRemove.Id,
+                chatId: demotedAdmin.Id,
                 text: AdminRemovedNotificationMessage,
                 parseMode: ParseMode.Html,
                 cancellationToken: CancellationToken.None
@@ -124,7 +121,7 @@ public class DemoteAdminCommandHandler(
         catch (ApiRequestException ex)
         {
             // Логируем ошибку, если не удалось отправить сообщение
-            logger.LogWarning(ex, "Couldn't send a message to the deleted examiner with the ID {AdminId}.", examinerToRemove.Id);
+            logger.LogWarning(ex, "Couldn't send a message to the demoted administrator with the ID {AdminId}.", demotedAdmin.Id);
         }
     }
 }

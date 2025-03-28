@@ -11,7 +11,7 @@ using SmartBot.Infrastructure.Contexts;
 namespace SmartBot.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250326220003_WorkingChats")]
+    [Migration("20250328143249_WorkingChats")]
     partial class WorkingChats
     {
         /// <inheritdoc />
@@ -39,7 +39,7 @@ namespace SmartBot.Infrastructure.Migrations
                     b.ToTable("Exporter", (string)null);
                 });
 
-            modelBuilder.Entity("SmartBot.Abstractions.Models.Report", b =>
+            modelBuilder.Entity("SmartBot.Abstractions.Models.Reports.Report", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -62,7 +62,7 @@ namespace SmartBot.Infrastructure.Migrations
                     b.ToTable("Reports", (string)null);
                 });
 
-            modelBuilder.Entity("SmartBot.Abstractions.Models.User", b =>
+            modelBuilder.Entity("SmartBot.Abstractions.Models.Users.User", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -79,9 +79,6 @@ namespace SmartBot.Infrastructure.Migrations
                     b.Property<DateTime>("RegistrationTime")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("ReviewingReportId")
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
 
@@ -96,8 +93,6 @@ namespace SmartBot.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ReviewingReportId");
-
                     b.HasIndex("SelectedWorkingChatId");
 
                     b.HasIndex("WorkingChatId");
@@ -105,7 +100,7 @@ namespace SmartBot.Infrastructure.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("SmartBot.Abstractions.Models.WorkingChat", b =>
+            modelBuilder.Entity("SmartBot.Abstractions.Models.WorkingChats.WorkingChat", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -123,21 +118,21 @@ namespace SmartBot.Infrastructure.Migrations
 
             modelBuilder.Entity("SmartBot.Abstractions.Models.Exporter", b =>
                 {
-                    b.HasOne("SmartBot.Abstractions.Models.Report", null)
+                    b.HasOne("SmartBot.Abstractions.Models.Reports.Report", null)
                         .WithMany()
                         .HasForeignKey("LastExportedReportId")
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
-            modelBuilder.Entity("SmartBot.Abstractions.Models.Report", b =>
+            modelBuilder.Entity("SmartBot.Abstractions.Models.Reports.Report", b =>
                 {
-                    b.HasOne("SmartBot.Abstractions.Models.User", "User")
+                    b.HasOne("SmartBot.Abstractions.Models.Users.User", "User")
                         .WithMany("Reports")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.OwnsOne("SmartBot.Abstractions.Models.UserReport", "EveningReport", b1 =>
+                    b.OwnsOne("SmartBot.Abstractions.Models.Reports.UserReport", "EveningReport", b1 =>
                         {
                             b1.Property<Guid>("ReportId")
                                 .HasColumnType("TEXT");
@@ -158,7 +153,7 @@ namespace SmartBot.Infrastructure.Migrations
                                 .HasForeignKey("ReportId");
                         });
 
-                    b.OwnsOne("SmartBot.Abstractions.Models.UserReport", "MorningReport", b1 =>
+                    b.OwnsOne("SmartBot.Abstractions.Models.Reports.UserReport", "MorningReport", b1 =>
                         {
                             b1.Property<Guid>("ReportId")
                                 .HasColumnType("TEXT");
@@ -187,25 +182,94 @@ namespace SmartBot.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("SmartBot.Abstractions.Models.User", b =>
+            modelBuilder.Entity("SmartBot.Abstractions.Models.Users.User", b =>
                 {
-                    b.HasOne("SmartBot.Abstractions.Models.Report", null)
-                        .WithMany()
-                        .HasForeignKey("ReviewingReportId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartBot.Abstractions.Models.WorkingChat", null)
+                    b.HasOne("SmartBot.Abstractions.Models.WorkingChats.WorkingChat", null)
                         .WithMany()
                         .HasForeignKey("SelectedWorkingChatId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("SmartBot.Abstractions.Models.WorkingChat", null)
+                    b.HasOne("SmartBot.Abstractions.Models.WorkingChats.WorkingChat", null)
                         .WithMany()
                         .HasForeignKey("WorkingChatId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.OwnsOne("SmartBot.Abstractions.Models.Users.AnswerFor", "AnswerFor", b1 =>
+                        {
+                            b1.Property<long>("UserId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<bool>("EveningReport")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<string>("Message")
+                                .IsRequired()
+                                .HasMaxLength(2000)
+                                .HasColumnType("TEXT");
+
+                            b1.Property<Guid>("ReportId")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<long>("ToUserId")
+                                .HasColumnType("INTEGER");
+
+                            b1.HasKey("UserId");
+
+                            b1.HasIndex("ReportId");
+
+                            b1.HasIndex("ToUserId");
+
+                            b1.ToTable("AnswersFor", (string)null);
+
+                            b1.HasOne("SmartBot.Abstractions.Models.Reports.Report", null)
+                                .WithMany()
+                                .HasForeignKey("ReportId")
+                                .OnDelete(DeleteBehavior.Cascade)
+                                .IsRequired();
+
+                            b1.HasOne("SmartBot.Abstractions.Models.Users.User", null)
+                                .WithMany()
+                                .HasForeignKey("ToUserId")
+                                .OnDelete(DeleteBehavior.Cascade)
+                                .IsRequired();
+
+                            b1.WithOwner()
+                                .HasForeignKey("UserId");
+                        });
+
+                    b.OwnsOne("SmartBot.Abstractions.Models.Users.ReviewingReport", "ReviewingReport", b1 =>
+                        {
+                            b1.Property<long>("UserId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<bool>("EveningReport")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<Guid>("ReportId")
+                                .HasColumnType("TEXT");
+
+                            b1.HasKey("UserId");
+
+                            b1.HasIndex("ReportId");
+
+                            b1.ToTable("ReviewingReports", (string)null);
+
+                            b1.HasOne("SmartBot.Abstractions.Models.Reports.Report", null)
+                                .WithMany()
+                                .HasForeignKey("ReportId")
+                                .OnDelete(DeleteBehavior.Cascade)
+                                .IsRequired();
+
+                            b1.WithOwner()
+                                .HasForeignKey("UserId");
+                        });
+
+                    b.Navigation("AnswerFor");
+
+                    b.Navigation("ReviewingReport");
                 });
 
-            modelBuilder.Entity("SmartBot.Abstractions.Models.User", b =>
+            modelBuilder.Entity("SmartBot.Abstractions.Models.Users.User", b =>
                 {
                     b.Navigation("Reports");
                 });

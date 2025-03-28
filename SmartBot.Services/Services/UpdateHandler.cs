@@ -6,7 +6,7 @@ using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using User = SmartBot.Abstractions.Models.User;
+using User = SmartBot.Abstractions.Models.Users.User;
 
 namespace SmartBot.Services.Services;
 

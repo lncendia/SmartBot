@@ -1,6 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Reports;
+using SmartBot.Abstractions.Models.Users;
+using SmartBot.Abstractions.Models.WorkingChats;
 
 namespace SmartBot.Infrastructure.Configurations;
 
@@ -17,7 +19,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     {
         // Настраиваем таблицу
         builder.ToTable("Users");
-        
+
         // Устанавливаем первичный ключ
         builder.HasKey(u => u.Id);
 
@@ -35,22 +37,45 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey(r => r.UserId) // Внешний ключ в Report
             .OnDelete(DeleteBehavior.Cascade); // Каскадное удаление
 
-        // Настраиваем связь many-to-one с сущностью Report
-        builder.HasOne<Report>() // У пользователя может быть только один отчёт на проверке
-            .WithMany() // У отчёта может быть много администраторов
-            .HasForeignKey(u => u.ReviewingReportId) // Внешний ключ в User
-            .OnDelete(DeleteBehavior.SetNull); // Установка внешнего ключа в null при удалении отчёта
-        
         // Настраиваем связь many-to-one с сущностью WorkingChat
         builder.HasOne<WorkingChat>() // У пользователя может быть только один рабочий чат
             .WithMany() // У рабочего чата может быть много пользователей
             .HasForeignKey(u => u.WorkingChatId) // Внешний ключ в User
             .OnDelete(DeleteBehavior.SetNull); // Установка внешнего ключа в null при удалении отчёта
-        
+
         // Настраиваем связь many-to-one с сущностью WorkingChat
         builder.HasOne<WorkingChat>() // У пользователя может быть только один рабочий чат
             .WithMany() // У рабочего чата может быть много пользователей
             .HasForeignKey(u => u.SelectedWorkingChatId) // Внешний ключ в User
             .OnDelete(DeleteBehavior.SetNull); // Установка внешнего ключа в null при удалении отчёта
+
+        builder.OwnsOne(u => u.AnswerFor, answerBuilder =>
+        {
+            answerBuilder.ToTable("AnswersFor");
+            
+            answerBuilder.HasOne<Report>()
+                .WithMany()
+                .HasForeignKey(a => a.ReportId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            answerBuilder.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(a => a.ToUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            answerBuilder.Property(a => a.Message)
+                .HasMaxLength(2000); // Максимальная длина 2000 символов
+        });
+
+        builder.OwnsOne(u => u.ReviewingReport, reviewingBuilder =>
+        {
+            reviewingBuilder.ToTable("ReviewingReports");
+            
+            // Настраиваем связь many-to-one с сущностью Report
+            reviewingBuilder.HasOne<Report>() // У пользователя может быть только один отчёт на проверке
+                .WithMany() // У отчёта может быть много администраторов
+                .HasForeignKey(u => u.ReportId) // Внешний ключ в User
+                .OnDelete(DeleteBehavior.Cascade); // Установка внешнего ключа в null при удалении отчёта
+        });
     }
 }

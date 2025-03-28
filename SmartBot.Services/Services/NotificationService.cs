@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Users;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;

@@ -1,9 +1,8 @@
 ﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Commands;
-using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.WorkingChats;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
@@ -48,9 +47,6 @@ public class AddWorkingChatCommandHandler(
                 Name = TruncateWithEllipsis(request.WorkingChatName)
             }, cancellationToken);
 
-            // Устанавливаем состояние пользователя на Idle (ожидание)
-            request.User!.State = State.Idle;
-
             // Сохраняем изменения в базе данных
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -81,10 +77,10 @@ public class AddWorkingChatCommandHandler(
     /// </summary>
     /// <param name="input">Входная строка</param>
     /// <returns>Обрезанная строка</returns>
-    public static string TruncateWithEllipsis(string input)
+    private static string TruncateWithEllipsis(string input)
     {
-        const int maxLength = 20;
-        const int trimLength = 18;
+        const int maxLength = 30;
+        const int trimLength = maxLength - 2;
         const string ellipsis = "...";
 
         if (string.IsNullOrEmpty(input))

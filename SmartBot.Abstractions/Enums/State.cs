@@ -29,11 +29,16 @@ public enum State
     /// Ожидает ввода комментария от пользователя.
     /// </summary>
     AwaitingCommentInput,
+    
+    /// <summary>
+    /// Ожидает ввода ответа на сообщение от пользователя.
+    /// </summary>
+    AwaitingAnswerInput,
 
     /// <summary>
-    /// 
+    /// Ожидает ввода идентификатора рабочего чата для добавления.
     /// </summary>
-    AwaitingWorkingChatForAdding,
+    AwaitingWorkingChatIdForAdding,
 
     /// <summary>
     /// Ожидает ввода идентификатора администратора для добавления.

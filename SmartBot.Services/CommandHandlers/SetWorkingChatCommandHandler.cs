@@ -3,7 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Users;
+using SmartBot.Abstractions.Models.WorkingChats;
 using SmartBot.Services.Extensions;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -26,33 +27,29 @@ public class SetWorkingChatCommandHandler(
     /// <summary>
     /// Сообщение, которое отправляется, если пользователь не найден.
     /// </summary>
-    private const string UserNotFoundMessage =
-        "❌ Пользователь не найден.";
+    private const string UserNotFoundMessage = "❌ Пользователь не найден.";
 
     /// <summary>
     /// Сообщение, которое отправляется, если пользователь не является сотрудником.
     /// </summary>
-    private const string UserNotEmployeeMessage =
-        "❌ Пользователь не является сотрудником.";
+    private const string UserNotEmployeeMessage = "❌ Пользователь не является сотрудником.";
 
     /// <summary>
     /// Сообщение, которое отправляется, если чат не найден.
     /// </summary>
-    private const string ChatNotFoundMessage =
-        "❌ Указанный чат не найден.";
+    private const string ChatNotFoundMessage = "❌ Указанный чат не найден.";
 
     /// <summary>
     /// Сообщение об успешной установке рабочего чата.
     /// </summary>
-    private const string WorkingChatSetSuccessMessage =
-        "✅ Рабочий чат успешно установлен!";
+    private const string WorkingChatSetSuccessMessage = "✅ Рабочий чат успешно установлен!";
 
     /// <summary>
     /// Сообщение для пользователя об изменении рабочего чата.
     /// </summary>
-    private const string WorkingChatChangedNotificationMessage =
+    private const string WorkingChatChangedNotificationMessageFormat =
         "<b>ℹ️ Уведомление:</b>\n\n" +
-        "Вам был назначен новый рабочий чат для обработки отчётов.";
+        "Вам был назначен новый рабочий чат «<i>{0}</i>» для обработки отчётов.";
 
     /// <summary>
     /// Обрабатывает команду установки рабочего чата пользователю.
@@ -135,7 +132,7 @@ public class SetWorkingChatCommandHandler(
             text: WorkingChatSetSuccessMessage,
             cancellationToken: CancellationToken.None
         );
-        
+
         // Удаляем исходное сообщение с кнопками
         await request.TryDeleteMessageAsync(client, CancellationToken.None);
 
@@ -144,7 +141,7 @@ public class SetWorkingChatCommandHandler(
         {
             await client.SendMessage(
                 chatId: targetUser.Id,
-                text: WorkingChatChangedNotificationMessage,
+                text: string.Format(WorkingChatChangedNotificationMessageFormat, targetChat.Name),
                 parseMode: ParseMode.Html,
                 cancellationToken: CancellationToken.None
             );

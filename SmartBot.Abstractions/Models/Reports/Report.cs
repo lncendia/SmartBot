@@ -1,4 +1,6 @@
-﻿namespace SmartBot.Abstractions.Models;
+﻿using SmartBot.Abstractions.Models.Users;
+
+namespace SmartBot.Abstractions.Models.Reports;
 
 /// <summary>
 /// Класс, представляющий отчет.

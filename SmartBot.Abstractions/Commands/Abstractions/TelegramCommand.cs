@@ -1,6 +1,6 @@
 ﻿using MediatR;
 using Telegram.Bot.Types;
-using User = SmartBot.Abstractions.Models.User;
+using User = SmartBot.Abstractions.Models.Users.User;
 
 namespace SmartBot.Abstractions.Commands.Abstractions;
 

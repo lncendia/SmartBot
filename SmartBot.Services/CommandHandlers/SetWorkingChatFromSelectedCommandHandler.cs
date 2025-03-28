@@ -2,9 +2,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
-using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Users;
+using SmartBot.Abstractions.Models.WorkingChats;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -51,9 +51,9 @@ public class SetWorkingChatFromSelectedCommandHandler(
     /// <summary>
     /// Сообщение для пользователя об изменении рабочего чата.
     /// </summary>
-    private const string WorkingChatChangedNotificationMessage =
+    private const string WorkingChatChangedNotificationMessageFormat =
         "<b>ℹ️ Уведомление:</b>\n\n" +
-        "Вам был назначен новый рабочий чат для обработки отчётов.";
+        "Вам был назначен новый рабочий чат «<i>{0}</i>» для обработки отчётов.";
 
     /// <summary>
     /// Обрабатывает команду установки рабочего чата пользователю.
@@ -121,12 +121,6 @@ public class SetWorkingChatFromSelectedCommandHandler(
         // Устанавливаем пользователю новый рабочий чат
         targetUser.WorkingChatId = targetChat.Id;
 
-        // Устанавливаем состояние текущего пользователя на Idle
-        request.User!.State = State.Idle;
-
-        // Сбрасываем ID проверяемого чата
-        request.User.SelectedWorkingChatId = null;
-        
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -144,7 +138,7 @@ public class SetWorkingChatFromSelectedCommandHandler(
         {
             await client.SendMessage(
                 chatId: targetUser.Id,
-                text: WorkingChatChangedNotificationMessage,
+                text: string.Format(WorkingChatChangedNotificationMessageFormat, targetChat.Name),
                 parseMode: ParseMode.Html,
                 cancellationToken: CancellationToken.None
             );

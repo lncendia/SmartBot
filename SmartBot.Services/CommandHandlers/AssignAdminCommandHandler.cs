@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Users;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -106,8 +106,8 @@ public class AssignAdminCommandHandler(
         {
             // Формируем текст сообщения на основании роли администратора
             var message = request.TeleAdmin
-                ? AlreadyAdminMessage 
-                : AlreadyTeleAdminMessage;
+                ? AlreadyTeleAdminMessage 
+                : AlreadyAdminMessage;
             
             // Отправляем сообщение о том, что пользователь уже является администратором
             await client.SendMessage(
@@ -124,31 +124,36 @@ public class AssignAdminCommandHandler(
 
         // Назначаем пользователя администратором
         newAdmin.Role = role;
-        newAdmin.State = State.Idle;
-
-        // Устанавливаем состояние текущего пользователя на Idle
-        request.User!.State = State.Idle;
+        
+        // Определяем новое состояние пользователя
+        var newState = request.TeleAdmin
+            ? State.AwaitingReportInput 
+            : State.Idle;
+        
+        // Обновляем состояние пользователя
+        newAdmin.State = newState;
 
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Формируем текст сообщения на основании роли администратора
         var addedSuccessMessage = request.TeleAdmin
-            ? AdminAddedSuccessMessage 
-            : TeleAdminAddedSuccessMessage;
+            ? TeleAdminAddedSuccessMessage 
+            : AdminAddedSuccessMessage;
         
         // Отправляем сообщение об успешном добавлении администратора текущему пользователю
         await client.SendMessage(
             chatId: request.ChatId,
             text: addedSuccessMessage,
             parseMode: ParseMode.Html,
+            replyMarkup: AdminKeyboard.GoBackKeyboard,
             cancellationToken: CancellationToken.None
         );
 
         // Формируем текст сообщения на основании роли администратора
         var newAdminMessage = request.TeleAdmin
-            ? NewAdminMessage 
-            : NewTeleAdminMessage;
+            ? NewTeleAdminMessage 
+            : NewAdminMessage;
         
         // Отправляем сообщение новому администратору
         try
@@ -163,7 +168,7 @@ public class AssignAdminCommandHandler(
         catch (ApiRequestException ex)
         {
             // Логируем ошибку, если не удалось отправить сообщение
-            logger.LogWarning(ex, "Couldn't send a message to a new examiner with an ID {AdminId}.", newAdmin.Id);
+            logger.LogWarning(ex, "Couldn't send a message to the assigned administrator with an ID {AdminId}.", newAdmin.Id);
         }
     }
 }

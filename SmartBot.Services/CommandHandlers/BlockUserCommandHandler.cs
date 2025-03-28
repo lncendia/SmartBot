@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Users;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -72,9 +72,6 @@ public class BlockUserCommandHandler(
 
         // Устанавливаем состояние пользователя на Blocked
         userToRemove.Role = Role.Blocked;
-
-        // Устанавливаем состояние текущего пользователя на Idle
-        request.User!.State = State.Idle;
 
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);

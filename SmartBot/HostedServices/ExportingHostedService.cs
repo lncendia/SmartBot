@@ -4,6 +4,8 @@ using SmartBot.Abstractions.Extensions;
 using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Interfaces.DataExporter;
 using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Reports;
+using SmartBot.Abstractions.Models.Users;
 
 namespace SmartBot.HostedServices;
 

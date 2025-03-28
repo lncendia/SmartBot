@@ -11,4 +11,9 @@ public class StartCommentCommand : AdminCallbackQuery
     /// Идентификатор отчёта
     /// </summary>
     public required Guid ReportId { get; init; }
+    
+    /// <summary>
+    /// 
+    /// </summary>
+    public required bool EveningReport { get; init; }
 }

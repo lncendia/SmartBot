@@ -16,8 +16,8 @@ namespace SmartBot.Services.CommandHandlers;
 /// </summary>
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
-public class GoBackCommandHandler(ITelegramBotClient client, IUnitOfWork unitOfWork)
-    : IRequestHandler<GoBackCommand>
+public class AdminGoBackCommandHandler(ITelegramBotClient client, IUnitOfWork unitOfWork)
+    : IRequestHandler<AdminGoBackCommand>
 {
     /// <summary>
     /// Приветственное сообщение административной панели
@@ -25,29 +25,31 @@ public class GoBackCommandHandler(ITelegramBotClient client, IUnitOfWork unitOfW
     private const string AdminPanelMessage =
         "<b>⚙️ Панель управления администратора</b>\n\n" +
         "Выберите действие из меню ниже:";
-    
+
     /// <summary>
     /// Обрабатывает команду возврата в состояние Idle.
     /// </summary>
     /// <param name="request">Запрос, содержащий данные о команде.</param>
     /// <param name="cancellationToken">Токен отмены операции.</param>
-    public async Task Handle(GoBackCommand request, CancellationToken cancellationToken)
+    public async Task Handle(AdminGoBackCommand request, CancellationToken cancellationToken)
     {
         // Проверяем, является ли пользователь администратором
         if (!await request.CheckAdminAsync(client, cancellationToken)) return;
 
-        // Устанавливаем состояние пользователя на Idle
-        request.User!.State = State.Idle;
+        // Получаем новое состояние пользователя
+        var newState = request.User!.Role == Role.TeleAdmin
+            ? State.AwaitingReportInput
+            : State.Idle;
 
-        // Сбрасываем ID проверяемого отчёта
-        request.User.ReviewingReportId = null;
+        // Устанавливаем состояние пользователя
+        request.User.State = newState;
         
         // Сбрасываем ID проверяемого чата
         request.User.SelectedWorkingChatId = null;
 
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        
+
         try
         {
             // Изменяем сообщение с основным меню администратора
@@ -71,7 +73,7 @@ public class GoBackCommandHandler(ITelegramBotClient client, IUnitOfWork unitOfW
                 cancellationToken: CancellationToken.None
             );
         }
-        
+
         // Отправляем сообщение с ReplyKeyboardRemove, чтобы убрать клавиатуру
         var message = await client.SendMessage(
             chatId: request.ChatId,

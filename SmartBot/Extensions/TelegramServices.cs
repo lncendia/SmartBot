@@ -37,8 +37,8 @@ public static class TelegramServices
             SecretToken = configuration.GetRequiredValue<string>("Telegram:Webhook:SecretToken")
         };
 
-        // Регистрируем HttpClient с именем "TgWebhook" для использования в TelegramBotClient
-        services.AddHttpClient("TgWebhook")
+        // Регистрируем HttpClient с именем "TelegramBotClient" для использования в TelegramBotClient
+        services.AddHttpClient("TelegramBotClient")
 
             // Регистрируем типизированный клиент ITelegramBotClient
             .AddTypedClient<ITelegramBotClient>(httpClient => new TelegramBotClient(token, httpClient));

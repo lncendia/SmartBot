@@ -15,60 +15,60 @@ public static class AdminKeyboard
     /// <summary>
     /// Callback-данные для кнопки "Назад".
     /// </summary>
-    public const string AdminGoBackCallbackData = "admin_goback";
+    public const string GoBackCallbackData = "admin_goback";
 
     /// <summary>
-    /// 
+    /// Callback-данные для кнопки удаления чата (с постфиксом ID чата).
     /// </summary>
-    public const string DeleteChatCallbackData = "delete_";
+    public const string DeleteChatCallbackData = "delete_chat_";
 
     /// <summary>
-    /// 
+    /// Callback-данные для кнопки выбора чата (с постфиксом ID чата).
     /// </summary>
-    public const string SelectChatCallbackData = "select_";
+    public const string SelectChatCallbackData = "select_chat_";
 
     /// <summary>
-    /// Callback-данные для команды назначения администратора
+    /// Callback-данные для команды назначения администратора.
     /// </summary>
     public const string AssignAdminCallbackData = "assign_admin";
 
     /// <summary>
-    /// Callback-данные для команды разжалования администратора
+    /// Callback-данные для команды разжалования администратора.
     /// </summary>
     public const string DemoteAdminCallbackData = "demote_admin";
 
     /// <summary>
-    /// Callback-данные для команды добавления рабочего чата
+    /// Callback-данные для команды добавления рабочего чата.
     /// </summary>
     public const string AddWorkingChatCallbackData = "add_working_chat";
 
     /// <summary>
-    /// Callback-данные для команды удаления рабочего чата
+    /// Callback-данные для команды удаления рабочего чата.
     /// </summary>
     public const string RemoveWorkingChatCallbackData = "remove_working_chat";
 
     /// <summary>
-    /// Callback-данные для команды блокировки пользователя
+    /// Callback-данные для команды блокировки пользователя.
     /// </summary>
     public const string BlockUserCallbackData = "block_user";
 
     /// <summary>
-    /// Callback-данные для команды установки рабочего чата пользователю
+    /// Callback-данные для команды установки рабочего чата пользователю.
     /// </summary>
     public const string SetWorkingChatCallbackData = "set_working_chat";
 
     /// <summary>
-    /// Callback-данные для выбора обычного администратора
+    /// Callback-данные для выбора обычного администратора.
     /// </summary>
     public const string SelectAdminCallbackData = "select_admin";
 
     /// <summary>
-    /// Callback-данные для выбора теле-администратора
+    /// Callback-данные для выбора теле-администратора.
     /// </summary>
     public const string SelectTeleAdminCallbackData = $"{SelectAdminCallbackData}_tele";
 
     /// <summary>
-    /// Основная клавиатура администратора с действиями
+    /// Основная клавиатура администратора с действиями.
     /// </summary>
     public static InlineKeyboardMarkup MainKeyboard { get; } = new(
         new List<List<InlineKeyboardButton>>
@@ -122,13 +122,14 @@ public static class AdminKeyboard
     /// Создаёт клавиатуру для администраторов с кнопкой "Оставить комментарий".
     /// </summary>
     /// <param name="reportId">Идентификатор отчёта, к которому будет привязан комментарий.</param>
+    /// <param name="isEveningReport">Флаг вечернего отчёта.</param>
     /// <returns>Клавиатура с кнопкой для оставления комментария.</returns>
-    public static InlineKeyboardMarkup ExamReportKeyboard(Guid reportId)
+    public static InlineKeyboardMarkup ExamReportKeyboard(Guid reportId, bool isEveningReport)
     {
         // Создаём кнопку с callback-запросом
         var button = InlineKeyboardButton.WithCallbackData(
             text: "Оставить комментарий 👀",
-            callbackData: $"{ExamReportCallbackData}{reportId}"
+            callbackData: $"{ExamReportCallbackData}{reportId}_{isEveningReport}"
         );
 
         // Возвращаем клавиатуру с одной кнопкой
@@ -141,7 +142,7 @@ public static class AdminKeyboard
     public static InlineKeyboardMarkup GoBackKeyboard { get; } = new(
         InlineKeyboardButton.WithCallbackData(
             text: "Назад ↩️",
-            callbackData: AdminGoBackCallbackData
+            callbackData: GoBackCallbackData
         )
     );
 
@@ -169,13 +170,13 @@ public static class AdminKeyboard
             {
                 InlineKeyboardButton.WithCallbackData(
                     text: "↩️ Назад",
-                    callbackData: AdminGoBackCallbackData
+                    callbackData: GoBackCallbackData
                 )
             }
         });
 
     /// <summary>
-    /// Клавиатура для выбора рабочего чата с запросом доступа
+    /// Клавиатура для выбора рабочего чата с запросом доступа.
     /// </summary>
     /// <remarks>
     /// Позволяет администратору выбрать чат из списка доступных.
@@ -200,7 +201,7 @@ public static class AdminKeyboard
     };
 
     /// <summary>
-    /// Клавиатура для выбора пользователя из чата
+    /// Клавиатура для выбора пользователя из чата.
     /// </summary>
     /// <remarks>
     /// Позволяет администратору выбрать одного или нескольких пользователей.
@@ -249,7 +250,7 @@ public static class AdminKeyboard
         keys.Add([
             InlineKeyboardButton.WithCallbackData(
                 text: "↩️ Назад",
-                callbackData: AdminGoBackCallbackData
+                callbackData: GoBackCallbackData
             )
         ]);
 
@@ -292,7 +293,7 @@ public static class AdminKeyboard
             keys.Add([
                 InlineKeyboardButton.WithCallbackData(
                     text: "↩️ Назад",
-                    callbackData: AdminGoBackCallbackData
+                    callbackData: GoBackCallbackData
                 )
             ]);
         }

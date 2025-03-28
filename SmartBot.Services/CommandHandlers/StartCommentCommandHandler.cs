@@ -3,7 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces;
-using SmartBot.Abstractions.Models;
+using SmartBot.Abstractions.Models.Reports;
+using SmartBot.Abstractions.Models.Users;
 using SmartBot.Services.Extensions;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
@@ -26,8 +27,7 @@ public class StartCommentCommandHandler(
     /// <summary>
     /// Сообщение, которое отправляется, если отчёт не найден.
     /// </summary>
-    private const string ReportNotFoundMessage =
-        "<b>❌ Ошибка:</b> Отчёт не найден. Возможно, он был удалён или ещё не создан.";
+    private const string ReportNotFoundMessage = "❌ Отчёт не найден.";
 
     /// <summary>
     /// Сообщение, которое отправляется администратору для ввода комментария.
@@ -39,9 +39,7 @@ public class StartCommentCommandHandler(
     /// <summary>
     /// Сообщение, которое отправляется, если отчёт уже выгружен и комментарий не может быть добавлен.
     /// </summary>
-    private const string ReportAlreadyExportedMessage =
-        "<b>⚠️ Информация:</b> Отчёт уже выгружен.\n\n" +
-        "Комментарий не может быть добавлен к выгруженному отчёту.";
+    private const string ReportAlreadyExportedMessage = "⚠️ Отчёт уже выгружен.";
 
     /// <summary>
     /// Обрабатывает команду начала ввода комментария к отчёту.
@@ -55,21 +53,21 @@ public class StartCommentCommandHandler(
 
         // Ищем отчёт в базе данных
         var report = await unitOfWork.Query<Report>()
+            .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.Id == request.ReportId, cancellationToken);
 
         // Если отчёт не найден
         if (report == null)
         {
-            // Удаляем сообщение с командой
-            await request.TryDeleteMessageAsync(client, cancellationToken);
-
             // Отправляем сообщение о том, что отчёт не найден
-            await client.SendMessage(
-                chatId: request.ChatId,
+            await client.AnswerCallbackQuery(
+                callbackQueryId: request.CallbackQueryId,
                 text: ReportNotFoundMessage,
-                parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken
             );
+
+            // Удаляем сообщение с командой
+            await request.TryDeleteMessageAsync(client, cancellationToken);
 
             // Завершаем выполнение метода
             return;
@@ -78,24 +76,29 @@ public class StartCommentCommandHandler(
         // Если это не сегодняшний отчёт
         if (report.Date.Date != dateTimeProvider.Now.Date)
         {
-            //todo:fddfdffd
-            // Удаляем сообщение с командой
-            await request.TryDeleteMessageAsync(client, cancellationToken);
-
             // Отправляем сообщение о том, что это не сегодняшний отчёт
-            await client.SendMessage(
-                chatId: request.ChatId,
+            await client.AnswerCallbackQuery(
+                callbackQueryId: request.CallbackQueryId,
                 text: ReportAlreadyExportedMessage,
-                parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken
             );
+
+            // Удаляем сообщение с командой
+            await request.TryDeleteMessageAsync(client, cancellationToken);
 
             // Завершаем выполнение метода
             return;
         }
 
-        // Устанавливаем у пользователя свойство ReviewingReportId
-        request.User!.ReviewingReportId = request.ReportId;
+        // Устанавливаем у пользователя свойство ReviewingReport
+        request.User!.ReviewingReport = new ReviewingReport
+        {
+            // Идентификатор отчёта
+            ReportId = request.ReportId,
+
+            // Флаг типа отчёта, утренний или вечерний
+            EveningReport = request.EveningReport
+        };
 
         // Устанавливаем состояние пользователя на AwaitingCommentInput
         request.User.State = State.AwaitingCommentInput;
@@ -108,7 +111,7 @@ public class StartCommentCommandHandler(
             chatId: request.ChatId,
             text: AwaitingCommentMessage,
             parseMode: ParseMode.Html,
-            replyMarkup: AdminKeyboard.GoBackKeyboard,
+            replyMarkup: DefaultKeyboard.CancelKeyboard,
             cancellationToken: CancellationToken.None
         );
     }
