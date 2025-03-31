@@ -5,7 +5,7 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для начала процесса выбора пользователя для назначения его администратором.
 /// </summary>
-public class StartSelectUserForAssignAdminCommand : AdminCallbackQuery
+public class StartSelectUserForAssignAdminCommand : CallbackQueryCommand
 {
     /// <summary>
     /// Флаг, указывающий, должен ли пользователь быть назначен как "Теле-администратор".

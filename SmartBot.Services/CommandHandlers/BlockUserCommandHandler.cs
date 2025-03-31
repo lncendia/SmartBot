@@ -34,7 +34,7 @@ public class BlockUserCommandHandler(
     /// Сообщение об успешном удалении пользователя.
     /// </summary>
     private const string UserRemovedSuccessMessage =
-        "<b>✅ Пользователь успешно удалён!</b>";
+        "<b>✅ Пользователь успешно заблокирован!</b>";
 
     /// <summary>
     /// Сообщение для удалённого пользователя.

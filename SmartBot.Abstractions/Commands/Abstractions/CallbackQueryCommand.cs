@@ -1,9 +1,9 @@
 ﻿namespace SmartBot.Abstractions.Commands.Abstractions;
 
 /// <summary>
-/// 
+/// Абстрактная команда CallbackQuery для Telegram
 /// </summary>
-public abstract class AdminCallbackQuery : TelegramCommand
+public abstract class CallbackQueryCommand : TelegramCommand
 {
     /// <summary>
     /// Идентификатор нажатия кнопки.

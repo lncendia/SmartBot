@@ -5,4 +5,4 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// 
 /// </summary>
-public class StartRemoveWorkingChatCommand : AdminCallbackQuery;
+public class StartRemoveWorkingChatCommand : CallbackQueryCommand;

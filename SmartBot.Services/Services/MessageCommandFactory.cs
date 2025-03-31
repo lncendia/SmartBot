@@ -24,6 +24,9 @@ public class MessageCommandFactory : IMessageCommandFactory
         // Проверяем, существует ли пользователь
         if (user == null)
         {
+            // Если это не приватный чат - возвращаем null.
+            if (message.Chat.Type != ChatType.Private) return null;
+
             // Если пользователь не найден, возвращаем команду для начала работы
             return new StartCommand
             {
@@ -31,6 +34,28 @@ public class MessageCommandFactory : IMessageCommandFactory
                 TelegramUserId = message.From!.Id
             };
         }
+
+        // Если пользователь запрашивает добавление текущего чата как рабочего
+        if (user.State is State.Idle or State.AwaitingReportInput && message.Text == "/addworkingchat")
+        {
+            // Если это не группа - возвращаем null.
+            if (message.Chat.Type is not ChatType.Group and not ChatType.Supergroup) return null;
+            
+            // Возвращаем команду добавления текущего чата как рабочего
+            return new AddWorkingChatFromMessageCommand
+            {
+                ChatId = message.Chat,
+                User = user,
+                TelegramUserId = message.From!.Id,
+                WorkingChatId = message.Chat.Id,
+                WorkingChatName = message.Chat.Title!,
+                MessageId = message.MessageId,
+                MessageThreadId = message.MessageThreadId
+            };
+        }
+
+        // Дальнейшие команды только для приватных чатов, если чат не приватный - возвращаем null.
+        if (message.Chat.Type != ChatType.Private) return null;
 
         // Если пользователь запрашивает вход в панель администратора
         if (user.State is State.Idle or State.AwaitingReportInput && message.Text == "/admin")
@@ -43,7 +68,7 @@ public class MessageCommandFactory : IMessageCommandFactory
                 TelegramUserId = message.From!.Id
             };
         }
-        
+
         // Если бот ожидает ввода ФИО
         if (user.State == State.AwaitingFullNameInput)
         {
@@ -79,6 +104,7 @@ public class MessageCommandFactory : IMessageCommandFactory
                 ChatId = message.Chat,
                 TelegramUserId = message.From!.Id,
                 User = user,
+                MessageId = message.Id,
                 Report = message.Text
             };
         }
@@ -95,7 +121,7 @@ public class MessageCommandFactory : IMessageCommandFactory
                 Comment = message.Text
             };
         }
-        
+
         // Если бот ожидает ввода ответа на комментарий
         if (user.State == State.AwaitingAnswerInput)
         {
@@ -121,7 +147,7 @@ public class MessageCommandFactory : IMessageCommandFactory
 
             // Получаем флаг необходимости добавления администратора как теле-администратора
             var teleAdmin = user.State == State.AwaitingTeleAdminIdForAdding;
-            
+
             // Возвращаем команду для добавления администратора
             return new AssignAdminCommand
             {

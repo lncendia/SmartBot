@@ -7,7 +7,7 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для начала процесса ответа на сообщение.
 /// </summary>
-public class StartAnswerCommand : AdminCallbackQuery
+public class StartAnswerCommand : CallbackQueryCommand
 {
     /// <summary>
     /// Идентификатор пользователя, которому адресован ответ

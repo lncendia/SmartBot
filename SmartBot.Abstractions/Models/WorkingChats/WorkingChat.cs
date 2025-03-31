@@ -25,5 +25,10 @@ public class WorkingChat
     /// Человекочитаемое название чата (например: "Отдел разработки - Утренние отчеты").
     /// Максимальная длина - 150 символов.
     /// </value>
-    public required string Name { get; init; }
+    public required string Name { get; set; }
+    
+    /// <summary>
+    /// Уникальный идентификатор для целевой ветки сообщений (топика) форума.
+    /// </summary>
+    public int? MessageThreadId { get; set; }
 }

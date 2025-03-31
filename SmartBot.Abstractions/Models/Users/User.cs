@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Models.Reports;
+using SmartBot.Abstractions.Models.WorkingChats;
 
 namespace SmartBot.Abstractions.Models.Users;
 
@@ -73,6 +74,14 @@ public class User
     public long? WorkingChatId { get; set; }
 
     /// <summary>
+    /// Рабочий чат пользователя
+    /// </summary>
+    /// <value>
+    /// Навигационное свойство
+    /// </value>
+    public WorkingChat? WorkingChat { get; init; }
+    
+    /// <summary>
     /// Флаг, указывающий наличие административных прав
     /// </summary>
     /// <value>
@@ -116,6 +125,15 @@ public class User
     /// Null - нет активного ответа.
     /// </value>
     public AnswerFor? AnswerFor { get; set; }
+    
+    /// <summary>
+    /// Контекст текущего отчёта
+    /// </summary>
+    /// <value>
+    /// Содержит информацию о текущем введенном отчёте пользователя.
+    /// Null - нет введенного отчёта.
+    /// </value>
+    public string? CurrentReport { get; set; }
 
     /// <summary>
     /// Коллекция отчетов пользователя

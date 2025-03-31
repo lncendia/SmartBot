@@ -270,6 +270,40 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
             }
         }
 
+        // Проверяем, находится ли пользователь в состоянии AwaitingReportInput
+        if (user.State is State.AwaitingReportInput && query.Message?.ReplyToMessage?.MessageId != null)
+        {
+            // Проверяем, является ли callback-данные командой для отправки отчёта без проверки анализатором
+            if (query.Data == DefaultKeyboard.SendWithoutAnalysisCallbackData)
+            {
+                // Создаем и возвращаем команду для отправки отчёта без проверки анализатором
+                return new SendReportWithoutAnalysisCommand
+                {
+                    ChatId = query.From.Id,
+                    MessageId = query.Message!.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    CallbackQueryId = query.Id,
+                    ReportMessageId = query.Message.ReplyToMessage.MessageId
+                };
+            }
+            
+            // Проверяем, является ли callback-данные командой для отправки отчёта на повторный анализ
+            if (query.Data == DefaultKeyboard.RepeatAnalysisCallbackData)
+            {
+                // Создаем и возвращаем команду для отправки отчёта на повторный анализ
+                return new RepeatReportAnalysisCommand
+                {
+                    ChatId = query.From.Id,
+                    MessageId = query.Message!.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    CallbackQueryId = query.Id,
+                    ReportMessageId = query.Message.ReplyToMessage.MessageId
+                };
+            }
+        }
+        
         // Обработка команды отмены при вводе комментария или ответа
         if (user.State is State.AwaitingCommentInput or State.AwaitingAnswerInput
             && query.Data == DefaultKeyboard.CancelCallbackData)

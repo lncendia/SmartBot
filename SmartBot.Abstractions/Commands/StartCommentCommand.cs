@@ -5,7 +5,7 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для начала комментирования отчёта
 /// </summary>
-public class StartCommentCommand : AdminCallbackQuery
+public class StartCommentCommand : CallbackQueryCommand
 {
     /// <summary>
     /// Идентификатор отчёта

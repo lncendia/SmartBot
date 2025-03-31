@@ -31,7 +31,7 @@ public class WebhookBackgroundService(
         {
             // Если сертификат не указан, устанавливаем вебхук без сертификата
             await botClient.SetWebhook(
-                // dropPendingUpdates:true,
+                // dropPendingUpdates: true,
                 url: settings.WebhookUrl, // URL вебхука
                 secretToken: settings.SecretToken, // Секретный токен
                 cancellationToken: stoppingToken // Токен отмены

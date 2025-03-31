@@ -5,7 +5,7 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для начала процесса выбора пользователя для установки рабочего чата пользователю.
 /// </summary>
-public class StartSelectUserForWorkingChatCommand : AdminCallbackQuery
+public class StartSelectUserForWorkingChatCommand : CallbackQueryCommand
 {
     /// <summary>
     /// Идентификатор рабочего чата, который необходимо установить пользователю.

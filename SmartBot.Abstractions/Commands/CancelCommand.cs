@@ -5,4 +5,4 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для возврата пользователя в исходное состояние.
 /// </summary>
-public class CancelCommand : AdminCallbackQuery;
+public class CancelCommand : CallbackQueryCommand;

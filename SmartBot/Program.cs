@@ -25,9 +25,6 @@ builder.Services.AddMediatorServices();
 // Регистрация контроллеров с поддержкой сериализации JSON
 builder.Services.AddControllers();
 
-// Добавление служб для работы с CORS
-builder.Services.AddCorsServices();
-
 // Создание приложения на основе настроек builder
 await using var app = builder.Build();
 
@@ -40,9 +37,6 @@ using (var scope = app.Services.CreateScope())
 
 // Добавляем мидлварь обработки ошибок
 app.UseSecretToken();
-
-// Включение CORS
-app.UseCors("DefaultPolicy");
 
 // Маппим контроллеры
 app.MapControllers();

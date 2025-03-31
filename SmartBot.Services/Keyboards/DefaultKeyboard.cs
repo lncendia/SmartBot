@@ -18,6 +18,16 @@ public static class DefaultKeyboard
     public const string AnswerCallbackData = "answer_";
 
     /// <summary>
+    /// Callback-данные для отправки отчета без анализа
+    /// </summary>
+    public const string SendWithoutAnalysisCallbackData = "send_without_analysis";
+    
+    /// <summary>
+    /// Callback-данные для повторного анализа отчёта
+    /// </summary>
+    public const string RepeatAnalysisCallbackData = "repeat_analysis";
+
+    /// <summary>
     /// Создаёт клавиатуру с одной кнопкой "Отмена"
     /// </summary>
     public static InlineKeyboardMarkup CancelKeyboard { get; } = new(
@@ -25,6 +35,50 @@ public static class DefaultKeyboard
             text: "❌ Отменить",
             callbackData: CancelCallbackData
         )
+    );
+
+    /// <summary>
+    /// Клавиатура с опцией отправки отчета без проверки ИИ
+    /// </summary>
+    /// <remarks>
+    /// Используется когда:
+    /// - Система анализа не доступна
+    /// - Пользователь хочет пропусить автоматическую проверку
+    /// - Принудительная отправка при проблемах с анализом
+    /// </remarks>
+    public static InlineKeyboardMarkup SendReportWithoutAnalysisKeyboard { get; } = new(
+        InlineKeyboardButton.WithCallbackData(
+            text: "⚠️ Отправить без проверки",
+            callbackData: SendWithoutAnalysisCallbackData
+        )
+    );
+
+
+    /// <summary>
+    /// Клавиатура с опцией повторного анализа отчета
+    /// </summary>
+    /// <remarks>
+    /// Используется когда:
+    /// - Система анализа не доступна
+    /// </remarks>
+    public static InlineKeyboardMarkup RepeatReportAnalysisKeyboard { get; } = new(
+        new List<List<InlineKeyboardButton>>
+        {
+            new()
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "🔂 Повторить",
+                    callbackData: RepeatAnalysisCallbackData
+                )
+            },
+            new()
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "⚠️ Отправить без проверки",
+                    callbackData: SendWithoutAnalysisCallbackData
+                )
+            },
+        }
     );
 
     /// <summary>

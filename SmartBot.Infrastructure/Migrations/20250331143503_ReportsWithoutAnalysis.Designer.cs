@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SmartBot.Infrastructure.Contexts;
 
@@ -10,9 +11,11 @@ using SmartBot.Infrastructure.Contexts;
 namespace SmartBot.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250331143503_ReportsWithoutAnalysis")]
+    partial class ReportsWithoutAnalysis
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.3");
@@ -107,9 +110,6 @@ namespace SmartBot.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("MessageThreadId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -193,7 +193,7 @@ namespace SmartBot.Infrastructure.Migrations
                         .HasForeignKey("SelectedWorkingChatId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("SmartBot.Abstractions.Models.WorkingChats.WorkingChat", "WorkingChat")
+                    b.HasOne("SmartBot.Abstractions.Models.WorkingChats.WorkingChat", null)
                         .WithMany()
                         .HasForeignKey("WorkingChatId")
                         .OnDelete(DeleteBehavior.SetNull);
@@ -271,8 +271,6 @@ namespace SmartBot.Infrastructure.Migrations
                     b.Navigation("AnswerFor");
 
                     b.Navigation("ReviewingReport");
-
-                    b.Navigation("WorkingChat");
                 });
 
             modelBuilder.Entity("SmartBot.Abstractions.Models.Users.User", b =>

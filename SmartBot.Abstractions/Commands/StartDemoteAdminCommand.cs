@@ -5,4 +5,4 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для начала процесса удаления администратора.
 /// </summary>
-public class StartDemoteAdminCommand : AdminCallbackQuery;
+public class StartDemoteAdminCommand : CallbackQueryCommand;

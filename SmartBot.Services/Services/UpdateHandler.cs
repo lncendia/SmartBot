@@ -41,11 +41,6 @@ public class UpdateHandler : IUpdateHandler
     private readonly IUnitOfWork _unitOfWork;
 
     /// <summary>
-    /// Сервис синхронизации пользователей.
-    /// </summary>
-    private readonly IUserSynchronizationService _synchronizationService;
-
-    /// <summary>
     /// Конструктор класса UpdateHandler.
     /// </summary>
     /// <param name="logger">Логгер для логирования событий и ошибок.</param>
@@ -53,21 +48,18 @@ public class UpdateHandler : IUpdateHandler
     /// <param name="messageCommandFactory">Фабрика для создания команд на основе сообщений.</param>
     /// <param name="callbackQueryCommandFactory">Фабрика для создания команд на основе callback-запросов.</param>
     /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
-    /// <param name="synchronizationService">Сервис синхронизации пользователей.</param>
     public UpdateHandler(
         ILogger<UpdateHandler> logger,
         ISender sender,
         IMessageCommandFactory messageCommandFactory,
         ICallbackQueryCommandFactory callbackQueryCommandFactory,
-        IUnitOfWork unitOfWork,
-        IUserSynchronizationService synchronizationService)
+        IUnitOfWork unitOfWork)
     {
         _logger = logger;
         _sender = sender;
         _messageCommandFactory = messageCommandFactory;
         _callbackQueryCommandFactory = callbackQueryCommandFactory;
         _unitOfWork = unitOfWork;
-        _synchronizationService = synchronizationService;
     }
 
     /// <summary>
@@ -122,13 +114,12 @@ public class UpdateHandler : IUpdateHandler
     {
         // Получаем пользователя из базы данных
         var user = await _unitOfWork.Query<User>()
+            .Include(u => u.WorkingChat)
+            .Where(u => u.Role != Role.Blocked)
             .FirstOrDefaultAsync(u => u.Id == callbackQuery.From.Id, cancellationToken: cancellationToken);
 
         // Если пользователь не найден, прерываем обработку
         if (user == null) return;
-        
-        // Если пользователь заблокирован - не продолжаем
-        if (user.Role == Role.Blocked) return;
 
         // Создаем команду на основе callback-запроса
         var command = _callbackQueryCommandFactory.GetCommand(user, callbackQuery);
@@ -136,19 +127,8 @@ public class UpdateHandler : IUpdateHandler
         // Если команда не создана, прерываем обработку
         if (command == null) return;
 
-        // Синхронизируем пользователя
-        await _synchronizationService.SynchronizeAsync(callbackQuery.From.Id, cancellationToken);
-
-        try
-        {
-            // Отправляем команду
-            await _sender.Send(command, cancellationToken);
-        }
-        finally
-        {
-            // Освобождаем синхронизацию
-            _synchronizationService.Release(callbackQuery.From.Id);
-        }
+        // Отправляем команду
+        await _sender.Send(command, cancellationToken);
     }
 
     /// <summary>
@@ -161,31 +141,21 @@ public class UpdateHandler : IUpdateHandler
         // Если отправитель сообщения неизвестен - не продолжаем
         if (message.From == null) return;
 
-        // Синхронизируем пользователя
-        await _synchronizationService.SynchronizeAsync(message.From.Id, cancellationToken);
+        // Если отправитель сообщения известен, получаем пользователя из базы данных
+        var user = await _unitOfWork.Query<User>()
+            .Include(u => u.WorkingChat)
+            .FirstOrDefaultAsync(u => u.Id == message.From.Id, cancellationToken: cancellationToken);
 
-        try
-        {
-            // Если отправитель сообщения известен, получаем пользователя из базы данных
-            var user = await _unitOfWork.Query<User>()
-                .FirstOrDefaultAsync(u => u.Id == message.From.Id, cancellationToken: cancellationToken);
+        // Если пользователь заблокирован - не продолжаем
+        if (user?.Role == Role.Blocked) return;
 
-            // Если пользователь заблокирован - не продолжаем
-            if (user?.Role == Role.Blocked) return;
+        // Создаем команду на основе сообщения
+        var command = _messageCommandFactory.GetCommand(user, message);
 
-            // Создаем команду на основе сообщения
-            var command = _messageCommandFactory.GetCommand(user, message);
+        // Если команда не создана, прерываем обработку
+        if (command == null) return;
 
-            // Если команда не создана, прерываем обработку
-            if (command == null) return;
-
-            // Отправляем команду
-            await _sender.Send(command, cancellationToken);
-        }
-        finally
-        {
-            // Освобождаем синхронизацию
-            _synchronizationService.Release(message.From.Id);
-        }
+        // Отправляем команду
+        await _sender.Send(command, cancellationToken);
     }
 }

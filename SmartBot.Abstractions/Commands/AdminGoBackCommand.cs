@@ -5,4 +5,4 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для возврата администратора в панель администратора.
 /// </summary>
-public class AdminGoBackCommand : AdminCallbackQuery;
+public class AdminGoBackCommand : CallbackQueryCommand;

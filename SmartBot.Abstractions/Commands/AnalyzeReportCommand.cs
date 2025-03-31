@@ -11,4 +11,9 @@ public class AnalyzeReportCommand : TelegramCommand
     /// Отчет
     /// </summary>
     public string? Report { get; init; }
+    
+    /// <summary>
+    /// Идентификатор сообщения
+    /// </summary>
+    public required int MessageId { get; init; }
 }

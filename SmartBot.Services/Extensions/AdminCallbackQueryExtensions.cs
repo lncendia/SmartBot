@@ -21,7 +21,7 @@ public static class AdminCallbackQueryExtensions
     /// <param name="client">Клиент Telegram Bot API</param>
     /// <param name="cancellationToken">Токен отмены операции</param>
     /// <returns>True если пользователь администратор, иначе False</returns>
-    public static async Task<bool> CheckAdminAsync(this AdminCallbackQuery command, ITelegramBotClient client, 
+    public static async Task<bool> CheckAdminAsync(this CallbackQueryCommand command, ITelegramBotClient client, 
         CancellationToken cancellationToken = default)
     {
         // Если пользователь администратор - возвращаем успех
@@ -48,7 +48,7 @@ public static class AdminCallbackQueryExtensions
     /// <param name="command">Команда callback-запроса</param>
     /// <param name="client">Клиент Telegram Bot API</param>
     /// <param name="cancellationToken">Токен отмены операции</param>
-    public static async Task TryDeleteMessageAsync(this AdminCallbackQuery command, ITelegramBotClient client,
+    public static async Task TryDeleteMessageAsync(this CallbackQueryCommand command, ITelegramBotClient client,
         CancellationToken cancellationToken = default)
     {
         try

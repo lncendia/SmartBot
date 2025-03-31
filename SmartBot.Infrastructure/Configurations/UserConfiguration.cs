@@ -31,51 +31,62 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Position)
             .HasMaxLength(50); // Максимальная длина 50 символов
 
+        // Устанавливаем ограничения для свойства CurrentReport
+        builder.Property(u => u.CurrentReport)
+            .HasMaxLength(5000); //Максимальная длина 5000 символов
+
         // Настраиваем связь one-to-many с сущностью Report
         builder.HasMany(u => u.Reports) // У пользователя может быть много отчётов
             .WithOne(r => r.User) // У отчёта может быть только один пользователь
             .HasForeignKey(r => r.UserId) // Внешний ключ в Report
             .OnDelete(DeleteBehavior.Cascade); // Каскадное удаление
 
-        // Настраиваем связь many-to-one с сущностью WorkingChat
-        builder.HasOne<WorkingChat>() // У пользователя может быть только один рабочий чат
+        // Настраиваем связь many-to-one между User и WorkingChat
+        builder.HasOne(u => u.WorkingChat) // У пользователя может быть только один рабочий чат
             .WithMany() // У рабочего чата может быть много пользователей
-            .HasForeignKey(u => u.WorkingChatId) // Внешний ключ в User
-            .OnDelete(DeleteBehavior.SetNull); // Установка внешнего ключа в null при удалении отчёта
+            .HasForeignKey(u => u.WorkingChatId) // Внешний ключ в таблице User
+            .OnDelete(DeleteBehavior.SetNull); // При удалении чата у пользователей WorkingChatId станет null
 
-        // Настраиваем связь many-to-one с сущностью WorkingChat
-        builder.HasOne<WorkingChat>() // У пользователя может быть только один рабочий чат
-            .WithMany() // У рабочего чата может быть много пользователей
-            .HasForeignKey(u => u.SelectedWorkingChatId) // Внешний ключ в User
-            .OnDelete(DeleteBehavior.SetNull); // Установка внешнего ключа в null при удалении отчёта
+        // Настраиваем связь many-to-one между User и временно выбранным WorkingChat
+        builder.HasOne<WorkingChat>() // У пользователя может быть только один временно выбранный чат
+            .WithMany() // У рабочего чата может быть много пользователей с временным выбором
+            .HasForeignKey(u => u.SelectedWorkingChatId) // Внешний ключ в таблице User
+            .OnDelete(DeleteBehavior.SetNull); // При удалении чата SelectedWorkingChatId станет null
 
+        // Настраиваем owned-тип AnswerFor (ответ на сообщение)
         builder.OwnsOne(u => u.AnswerFor, answerBuilder =>
         {
+            // Храним в отдельной таблице
             answerBuilder.ToTable("AnswersFor");
-            
+
+            // Связь с отчетом, на который дается ответ
             answerBuilder.HasOne<Report>()
                 .WithMany()
                 .HasForeignKey(a => a.ReportId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Cascade); // Каскадное удаление при удалении отчета
 
+            // Связь с пользователем, которому адресован ответ
             answerBuilder.HasOne<User>()
                 .WithMany()
                 .HasForeignKey(a => a.ToUserId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Cascade); // Каскадное удаление при удалении пользователя
 
+            // Ограничение длины текста ответа
             answerBuilder.Property(a => a.Message)
-                .HasMaxLength(2000); // Максимальная длина 2000 символов
+                .HasMaxLength(2000); // Максимальная длина соответствует ограничениям Telegram
         });
 
+        // Настраиваем owned-тип ReviewingReport (проверяемый отчет)
         builder.OwnsOne(u => u.ReviewingReport, reviewingBuilder =>
         {
+            // Храним в отдельной таблице
             reviewingBuilder.ToTable("ReviewingReports");
-            
-            // Настраиваем связь many-to-one с сущностью Report
-            reviewingBuilder.HasOne<Report>() // У пользователя может быть только один отчёт на проверке
-                .WithMany() // У отчёта может быть много администраторов
-                .HasForeignKey(u => u.ReportId) // Внешний ключ в User
-                .OnDelete(DeleteBehavior.Cascade); // Установка внешнего ключа в null при удалении отчёта
+
+            // Связь с проверяемым отчетом
+            reviewingBuilder.HasOne<Report>()
+                .WithMany()
+                .HasForeignKey(u => u.ReportId)
+                .OnDelete(DeleteBehavior.Cascade); // Каскадное удаление при удалении отчета
         });
     }
 }

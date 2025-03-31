@@ -5,7 +5,7 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для установки рабочего чата пользователю.
 /// </summary>
-public class SetWorkingChatCommand : AdminCallbackQuery
+public class SetWorkingChatCommand : CallbackQueryCommand
 {
     /// <summary>
     /// Идентификатор рабочего чата.

@@ -5,7 +5,7 @@ namespace SmartBot.Abstractions.Commands;
 /// <summary>
 /// Команда для удаления рабочего чата.
 /// </summary>
-public class RemoveWorkingChatCommand : AdminCallbackQuery
+public class RemoveWorkingChatCommand : CallbackQueryCommand
 {
     /// <summary>
     /// Идентификатор рабочего чата, который нужно удалить.
