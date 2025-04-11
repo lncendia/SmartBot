@@ -159,6 +159,10 @@ public class AnalyzeReportCommandHandler(
         // Синхронизируем пользователя
         await synchronizationService.SynchronizeAsync(request.TelegramUserId, ct);
 
+        // Так как команда помечена атрибутом AsyncCommand, она выполняется в другом контексте.
+        // Поэтому обновляем сущность User что бы она отслеживалась
+        unitOfWork.Update(request.User!);
+
         try
         {
             // Обрабатываем команду
@@ -703,6 +707,12 @@ public class AnalyzeReportCommandHandler(
             cancellationToken: ct
         );
 
+        // Отправляем индикатор "печатает" в чат пользователя.
+        await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
+        
+        // Создаем задачу задержки на 1 секунду с учетом токена отмены
+        await Task.Delay(TimeSpan.FromSeconds(2), ct);
+
         // 2. Рекомендации на день
         await client.SendMessage(
             replyParameters: new ReplyParameters { MessageId = request.MessageId },
@@ -710,6 +720,12 @@ public class AnalyzeReportCommandHandler(
             text: motivation.Result.Recommendations,
             cancellationToken: ct
         );
+        
+        // Отправляем индикатор "печатает" в чат пользователя.
+        await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
+        
+        // Создаем задачу задержки на 1 секунду с учетом токена отмены
+        await Task.Delay(TimeSpan.FromSeconds(2), ct);
 
         // 3. Юмористическое завершение
         await client.SendMessage(
@@ -740,6 +756,12 @@ public class AnalyzeReportCommandHandler(
             text: praise.Result.Achievements,
             cancellationToken: ct
         );
+        
+        // Отправляем индикатор "печатает" в чат пользователя.
+        await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
+        
+        // Создаем задачу задержки на 1 секунду с учетом токена отмены
+        await Task.Delay(TimeSpan.FromSeconds(2), ct);
 
         // 2. Похвалу за проделанную работу
         await client.SendMessage(
@@ -748,6 +770,12 @@ public class AnalyzeReportCommandHandler(
             text: praise.Result.Praise,
             cancellationToken: ct
         );
+        
+        // Отправляем индикатор "печатает" в чат пользователя.
+        await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
+        
+        // Создаем задачу задержки на 1 секунду с учетом токена отмены
+        await Task.Delay(TimeSpan.FromSeconds(2), ct);
 
         // 3. Юмористическое завершение дня
         await client.SendMessage(
@@ -783,6 +811,9 @@ public class AnalyzeReportCommandHandler(
 
         // Начисляем очки, если они положительные
         if (earnedScore > 0) request.User.Score += earnedScore;
+
+        // Сохраняем изменения
+        await unitOfWork.SaveChangesAsync(ct);
 
         // Получаем актуальное звание ПОСЛЕ начисления очков
         var currentRank = request.User.Rank;

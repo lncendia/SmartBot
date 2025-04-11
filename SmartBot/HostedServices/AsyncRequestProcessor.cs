@@ -69,8 +69,6 @@ public sealed class AsyncRequestProcessor : BackgroundService, IAsyncSender
     {
         var workerTasks = new List<Task>();
 
-        stoppingToken.Register(() => _logger.LogError("\n\nКакого хуя"));
-
         // Запуск N воркеров для параллельной обработки команд.
         for (var i = 0; i < _workerCount; i++)
         {

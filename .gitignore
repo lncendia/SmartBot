@@ -483,6 +483,6 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-database.db
-appsettings.Production.json
+database.*
+appsettings.*
 google.credentials*
