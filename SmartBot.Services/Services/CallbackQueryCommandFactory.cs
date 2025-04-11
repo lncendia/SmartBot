@@ -1,6 +1,6 @@
 ﻿using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.ComandFactories;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot.Extensions;
 using Telegram.Bot.Types;

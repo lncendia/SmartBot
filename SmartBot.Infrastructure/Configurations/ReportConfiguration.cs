@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SmartBot.Abstractions.Models;
 using SmartBot.Abstractions.Models.Reports;
 
 namespace SmartBot.Infrastructure.Configurations;

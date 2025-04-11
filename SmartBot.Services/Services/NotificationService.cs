@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Enums;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Notification;
+using SmartBot.Abstractions.Interfaces.Storage;
+using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Users;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -115,6 +117,9 @@ public class NotificationService(
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
+
             // Выбираем только ID пользователей.
             .Select(u => u.Id)
 
@@ -144,6 +149,9 @@ public class NotificationService(
 
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
+
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
 
             // Выбираем только ID пользователей.
             .Select(u => u.Id)
@@ -175,6 +183,9 @@ public class NotificationService(
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
+
             // Выбираем только ID пользователей.
             .Select(u => u.Id)
 
@@ -205,6 +216,9 @@ public class NotificationService(
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
+
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
 
@@ -219,6 +233,9 @@ public class NotificationService(
 
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
+
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
@@ -253,6 +270,9 @@ public class NotificationService(
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
+
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
 
@@ -267,6 +287,9 @@ public class NotificationService(
 
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
+
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
@@ -303,6 +326,9 @@ public class NotificationService(
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
 
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
+
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)
 
@@ -317,6 +343,9 @@ public class NotificationService(
 
             // Фильтруем пользователей, не являющихся администратороми
             .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
+
+            // Фильтруем пользователей которые заполнили свои данные`
+            .Where(u => u.Position != null)
 
             // Выбираем только ID пользователей для дальнейшей обработки.
             .Select(u => u.Id)

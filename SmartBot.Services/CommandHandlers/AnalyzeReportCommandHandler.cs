@@ -5,8 +5,10 @@ using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Configuration;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
-using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
+using SmartBot.Abstractions.Interfaces.ReportAnalyzer.DTOs;
+using SmartBot.Abstractions.Interfaces.Storage;
+using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
@@ -138,19 +140,29 @@ public class AnalyzeReportCommandHandler(
         "📝 <i>Не забудьте указать ключевые результаты и планы на завтра.</i>";
 
     /// <summary>
+    /// Шаблон сообщения о прогрессе пользователя
+    /// </summary>
+    private const string RankProgressMessage =
+        "<b>🏆 Ваш прогресс:</b>\n\n" +
+        "{0}\n" +
+        "📊 <b>Текущий рейтинг:</b> {1:N2} очков\n" +
+        "🎯 <b>До следующего звания:</b> {2:N2} очков\n" +
+        "👥 <b>Пользователей позади вас:</b> {3}";
+
+    /// <summary>
     /// Обрабатывает команду анализа отчёта.
     /// </summary>
     /// <param name="request">Запрос, содержащий данные о команде анализа отчёта.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    public async Task Handle(AnalyzeReportCommand request, CancellationToken cancellationToken)
+    /// <param name="ct">Токен отмены операции.</param>
+    public async Task Handle(AnalyzeReportCommand request, CancellationToken ct)
     {
         // Синхронизируем пользователя
-        await synchronizationService.SynchronizeAsync(request.TelegramUserId, cancellationToken);
+        await synchronizationService.SynchronizeAsync(request.TelegramUserId, ct);
 
         try
         {
             // Обрабатываем команду
-            await ProcessCommandAsync(request, cancellationToken);
+            await ProcessCommandAsync(request, ct);
         }
         finally
         {
@@ -160,312 +172,372 @@ public class AnalyzeReportCommandHandler(
     }
 
     /// <summary>
-    /// Обрабатывает команду анализа отчёта.
+    /// Основной метод обработки команды анализа отчёта.
+    /// Выполняет последовательную проверку и обработку входящего отчёта.
     /// </summary>
-    /// <param name="request">Запрос, содержащий данные о команде анализа отчёта.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    private async Task ProcessCommandAsync(AnalyzeReportCommand request, CancellationToken cancellationToken)
+    /// <param name="request">Запрос, содержащий данные отчёта и контекст выполнения</param>
+    /// <param name="ct">Токен для отмены асинхронной операции</param>
+    private async Task ProcessCommandAsync(AnalyzeReportCommand request, CancellationToken ct)
     {
-        // Валидируем введённый отчёт
-        if (!IsReportValid(request.Report))
-        {
-            // Если отчёт пустой, отправляем сообщение об ошибке
-            await client.SendMessage(
-                replyParameters: new ReplyParameters
-                {
-                    MessageId = request.MessageId
-                },
-                chatId: request.ChatId,
-                text: EmptyReportErrorMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
+        // Первичная валидация содержимого отчёта:
+        // - проверка на null/пустую строку
+        // - проверка максимальной длины
+        if (!await ValidateReportAsync(request, ct)) return;
 
-            // Завершаем выполнение метода
-            return;
-        }
+        // Получаем текущее время с поправкой на часовой пояс
+        // TODO: Вынести часовой пояс в конфигурацию
+        var now = dateTimeProvider.Now.AddHours(-5);
 
-        // Получаем текущую дату и время
-        var now = dateTimeProvider.Now;
+        // Проверяем временные ограничения:
+        // - рабочие часы для отправки отчётов
+        // - корректное время для утреннего/вечернего отчёта
+        if (!await CheckTimeRestrictionsAsync(request, now, ct)) return;
 
-        // Если текущее время не подходит для отправки утреннего или вечернего отчёта
-        if (!now.IsWorkingPeriod())
-        {
-            // Отправляем сообщение о временных ограничениях
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: ReportTimeRestrictionMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
-
-        // Записываем введенный отчёт пользователя в состояние, чтобы в дальнейшем можно было отправить его без проверки
+        // Сохраняем текст отчёта во временное состояние пользователя
+        // Это позволяет повторить отправку без ввода текста заново
         request.User!.CurrentReport = request.Report;
 
-        // Получаем отчёт из базы данных за текущую дату для указанного пользователя
-        var report = await unitOfWork.Query<Report>()
+        // Получаем существующий отчёт из БД или создаём новый объект
+        var report = await GetReportAsync(request, now, ct);
+
+        // Проверяем возможность отправки отчёта:
+        // - не был ли уже отправлен утренний/вечерний отчёт
+        if (!await CheckReportAbilityAsync(request, report, now, ct)) return;
+
+        // Если анализатор отчётов включен в конфигурации - выполняем анализ
+        if (!await AnalyzeReportAsync(request, ct))
+        {
+            // В случае проблем с анализом сохраняем возможные изменения
+            await unitOfWork.SaveChangesAsync(ct);
+
+            // Прекращаем обработку при ошибке анализа
+            return;
+        }
+
+        // Обновляем данные отчёта и сохраняем в БД:
+        // - для нового отчёта заполняем все поля
+        // - для существующего обновляем вечерний отчёт
+        report = await UpdateAndSaveReportAsync(request, report, now, ct);
+
+        // Отправляем пользователю сообщение об успешной отправке:
+        // - разный текст для утреннего/вечернего отчёта
+        // - уведомление о просрочке при необходимости
+        await SendSuccessMessageToUserAsync(request, report);
+
+        // Уведомляем администраторов о новом отчёте:
+        // - всем администраторам системы
+        // - в рабочий чат пользователя (если указан)
+        await NotifyAdminsAsync(request, report);
+
+        // Если анализатор включен, отправляем дополнительные сообщения:
+        // - утренняя мотивация и рекомендации
+        // - вечерняя оценка и похвала
+        await SendMotivationalMessagesAsync(request, report, ct);
+    }
+
+    /// <summary>
+    /// Проверяет валидность отчёта и отправляет сообщение об ошибке, если отчёт невалиден.
+    /// Выполняет две основные проверки:
+    /// 1. Что отчёт не является пустым или состоящим только из пробелов
+    /// 2. Что длина отчёта не превышает максимально допустимую (5000 символов)
+    /// </summary>
+    /// <param name="request">Запрос, содержащий данные отчёта и контекст сообщения</param>
+    /// <param name="ct">Токен для отмены асинхронной операции</param>
+    /// <returns>
+    /// Возвращает true, если отчёт прошёл все проверки,
+    /// false - если обнаружены нарушения валидации
+    /// </returns>
+    private async Task<bool> ValidateReportAsync(AnalyzeReportCommand request, CancellationToken ct)
+    {
+        // Комплексная проверка валидности отчёта
+        var isValid = !string.IsNullOrWhiteSpace(request.Report) && request.Report.Length <= 5000;
+
+        // Если отчёт валиден, сразу возвращаем положительный результат
+        if (isValid) return true;
+
+        // Если отчёт не прошёл проверку, отправляем сообщение об ошибке
+        await client.SendMessage(
+            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            chatId: request.ChatId,
+            text: EmptyReportErrorMessage,
+            parseMode: ParseMode.Html,
+            cancellationToken: ct
+        );
+
+        // Возвращаем false как индикатор невалидного отчёта
+        return false;
+    }
+
+    /// <summary>
+    /// Проверяет временные ограничения для отправки отчётов.
+    /// Определяет, разрешено ли отправлять отчёты в текущий момент времени.
+    /// </summary>
+    /// <param name="request">Запрос с контекстом выполнения</param>
+    /// <param name="now">Текущее время с учётом поправки часового пояса</param>
+    /// <param name="ct">Токен для отмены операции</param>
+    /// <returns>
+    /// Возвращает true, если текущее время подходит для отправки отчётов,
+    /// false - если отправка запрещена по временным ограничениям
+    /// </returns>
+    private async Task<bool> CheckTimeRestrictionsAsync(AnalyzeReportCommand request, DateTime now,
+        CancellationToken ct)
+    {
+        // Проверяем находится ли текущее время в разрешённом периоде
+        if (now.IsWorkingPeriod()) return true;
+
+        // Если время неподходящее, отправляем сообщение о временных ограничениях:
+        await client.SendMessage(
+            chatId: request.ChatId,
+            text: ReportTimeRestrictionMessage,
+            parseMode: ParseMode.Html,
+            cancellationToken: ct
+        );
+
+        // Возвращаем false как индикатор временного ограничения
+        return false;
+    }
+
+    /// <summary>
+    /// Получает или создаёт отчёт из базы данных.
+    /// </summary>
+    /// <param name="request">Запрос с данными отчёта.</param>
+    /// <param name="now">Текущее время.</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    /// <returns>Объект отчёта или null, если дальнейшая обработка не требуется.</returns>
+    private async Task<Report?> GetReportAsync(AnalyzeReportCommand request, DateTime now,
+        CancellationToken ct)
+    {
+        // Запрашиваем отчёт из базы данных по ID пользователя и дате
+        return await unitOfWork.Query<Report>()
             .Where(r => r.UserId == request.TelegramUserId)
             .Where(r => r.Date.Date == now.Date)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(ct);
+    }
 
-        // Если вечерний отчёт уже сдан - ничего не делаем
+    /// <summary>
+    /// Проверяет возможность отправки отчёта в текущий момент времени.
+    /// Выполняет две основные проверки:
+    /// 1. Проверяет не был ли уже отправлен вечерний отчёт
+    /// 2. Проверяет не был ли уже отправлен утренний отчёт, когда ещё не наступило время вечернего
+    /// </summary>
+    /// <param name="request">Запрос с данными отчёта и контекстом сообщения</param>
+    /// <param name="report">Объект отчёта из базы данных (может быть null если отчёт новый)</param>
+    /// <param name="now">Текущее время с учётом временной зоны</param>
+    /// <param name="ct">Токен для отмены асинхронных операций</param>
+    /// <returns>
+    /// Возвращает true если:
+    /// - отчёт новый (null)
+    /// - вечерний отчёт ещё не отправлен
+    /// - утренний отчёт не отправлен или наступило время вечернего.
+    /// Возвращает false и отправляет соответствующее сообщение если:
+    /// - вечерний отчёт уже существует
+    /// - утренний отчёт уже существует и не наступило время вечернего
+    /// </returns>
+    private async Task<bool> CheckReportAbilityAsync(AnalyzeReportCommand request, Report? report, DateTime now,
+        CancellationToken ct)
+    {
+        // Проверка 1: Вечерний отчёт уже существует
         if (report?.EveningReport != null)
         {
-            // Отправляем сообщение о том, что вечерний отчёт уже был отправлен
+            // Отправляем сообщение, что вечерний отчёт уже был отправлен
             await client.SendMessage(
                 chatId: request.ChatId,
                 text: EveningReportAlreadySentMessage,
                 parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
+                cancellationToken: ct
             );
 
-            // Завершаем выполнение метода
-            return;
+            // Возвращаем false - отправка невозможна
+            return false;
         }
 
-        // Если утренний отчёт уже сдан и еще не время для сдачи вечернего отчёта
+        // Проверка 2: Утренний отчёт существует И сейчас не вечерний период
         if (report?.MorningReport != null && !now.IsEveningPeriod())
         {
-            // Отправляем сообщение о том, что утренний отчёт уже был отправлен
+            // Отправляем сообщение, что утренний отчёт уже был отправлен
             await client.SendMessage(
                 chatId: request.ChatId,
                 text: MorningReportAlreadySentMessage,
                 parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken
+                cancellationToken: ct
             );
 
-            // Завершаем выполнение метода
-            return;
+            // Возвращаем false - отправка невозможна
+            return false;
         }
 
-        // Если анализатор отчётов включен - анализируем отчёт
-        if (analyzerConfiguration.Enabled)
+        // Если все проверки пройдены - возвращаем true
+        return true;
+    }
+
+    /// <summary>
+    /// Анализирует содержимое отчёта с помощью внешнего анализатора.
+    /// </summary>
+    /// <param name="request">Запрос, содержащий текст отчёта и контекст сообщения</param>
+    /// <param name="ct">Токен для отмены асинхронных операций</param>
+    /// <returns>
+    /// Возвращает true, если:
+    /// - анализатор отключен в конфигурации
+    /// - анализ успешно завершен и оценка выше минимальной.
+    /// Возвращает false, если:
+    /// - возникла ошибка анализа
+    /// - оценка отчёта ниже минимального порога
+    /// </returns>
+    private async Task<bool> AnalyzeReportAsync(AnalyzeReportCommand request, CancellationToken ct)
+    {
+        // Проверяем включен ли анализатор в конфигурации системы
+        // Если анализатор отключен - пропускаем весь процесс анализа
+        if (!analyzerConfiguration.Enabled) return true;
+
+        // Объявляем переменную для хранения результатов анализа
+        ReportAnalysisResult analysisResult;
+
+        try
         {
-            // Объявляем переменную для хранения результата анализа отчёта
-            ReportAnalyzeResult analysisResult;
+            // Запускаем асинхронный анализ содержимого отчёта
+            var task = reportAnalyzer.AnalyzeReportAsync(request.Report!, ct);
 
-            try
-            {
-                // Выполняем асинхронный анализ отчёта с использованием анализатора
-                var task = reportAnalyzer.AnalyzeAsync(request.Report!, cancellationToken);
+            // Пока анализ выполняется, периодически отправляем индикатор "печатает"
+            // чтобы пользователь видел, что система работает
+            await SendTypingWhileWaitingAsync(request, task, ct);
 
-                // Пока задача не завершена, отправляем статус "печатает" в чат
-                while (!task.IsCompleted)
-                {
-                    await client.SendChatAction(request.ChatId, ChatAction.Typing,
-                        cancellationToken: cancellationToken);
+            // Дожидаемся завершения задачи и получаем результат
+            analysisResult = task.Result;
+        }
+        catch
+        {
+            // В случае любой ошибки при анализе уведомляем пользователя о проблеме
+            await client.SendMessage(
+                replyParameters: new ReplyParameters { MessageId = request.MessageId },
+                chatId: request.ChatId,
+                text: AnalyzerUnavailableMessage,
+                replyMarkup: DefaultKeyboard.RepeatReportAnalysisKeyboard,
+                parseMode: ParseMode.Html,
+                cancellationToken: ct
+            );
 
-                    // Ждём 2 секунды перед следующей проверкой
-                    await Task.Delay(2000, cancellationToken);
-                }
-
-                // Получаем результат анализа
-                analysisResult = task.Result;
-            }
-            catch
-            {
-                // Сохраняем изменения в базе данных.
-                await unitOfWork.SaveChangesAsync(cancellationToken);
-
-                // Если произошла ошибка при анализе отчёта, отправляем сообщение об ошибке в чат
-                await client.SendMessage(
-                    replyParameters: new ReplyParameters
-                    {
-                        MessageId = request.MessageId
-                    },
-                    chatId: request.ChatId,
-                    text: AnalyzerUnavailableMessage,
-                    replyMarkup: DefaultKeyboard.RepeatReportAnalysisKeyboard,
-                    parseMode: ParseMode.Html,
-                    cancellationToken: cancellationToken
-                );
-
-                // Не продолжаем
-                return;
-            }
-
-            // Если отчёт некорректен (оценка меньше MinScore), отправляем рекомендации
-            if (analysisResult.Score < analyzerConfiguration.MinScore)
-            {
-                // Сохраняем изменения в базе данных.
-                await unitOfWork.SaveChangesAsync(cancellationToken);
-
-                // Отправляем сообщение с рекомендациями по исправлению отчёта
-                await client.SendMessage(
-                    replyParameters: new ReplyParameters
-                    {
-                        MessageId = request.MessageId
-                    },
-                    chatId: request.ChatId,
-                    text: string.Format(ErrorMessage, analysisResult.Score, analysisResult.Recommendations),
-                    replyMarkup: DefaultKeyboard.SendReportWithoutAnalysisKeyboard,
-                    parseMode: ParseMode.Html,
-                    cancellationToken: cancellationToken
-                );
-
-                // Завершаем выполнение метода
-                return;
-            }
+            // Возвращаем false как признак неудачного анализа
+            return false;
         }
 
-        // Получаем текущее время после анализа данных.
-        var timeAfterAnalyze = dateTimeProvider.Now;
+        // Проверяем соответствует ли оценка отчёта минимальным требованиям
+        if (analysisResult.Score < analyzerConfiguration.MinScore)
+        {
+            // Если оценка слишком низкая формируем и отправляем сообщение с рекомендациями по улучшению
+            await client.SendMessage(
+                replyParameters: new ReplyParameters { MessageId = request.MessageId },
+                chatId: request.ChatId,
+                text: string.Format(ErrorMessage, analysisResult.Score, analysisResult.Recommendations),
+                replyMarkup: DefaultKeyboard.SendReportWithoutAnalysisKeyboard,
+                parseMode: ParseMode.Html,
+                cancellationToken: ct
+            );
 
-        // Если отчёт за текущую дату отсутствует, создаём новый.
+            // Возвращаем false как признак несоответствия требованиям
+            return false;
+        }
+
+        // Если все проверки пройдены успешно - возвращаем true
+        return true;
+    }
+
+    /// <summary>
+    /// Обновляет или создает новый отчет и сохраняет его в базу данных.
+    /// Обрабатывает два сценария:
+    /// 1. Создание нового отчета (если report == null)
+    /// 2. Обновление существующего отчета (добавление вечернего отчета)
+    /// </summary>
+    /// <param name="request">Запрос с данными отчета и контекстом пользователя</param>
+    /// <param name="report">Существующий объект отчета или null</param>
+    /// <param name="now">Текущее время с учетом часового пояса</param>
+    /// <param name="ct">Токен для отмены асинхронных операций</param>
+    /// <returns>Обновленный или созданный объект отчета</returns>
+    private async Task<Report> UpdateAndSaveReportAsync(AnalyzeReportCommand request, Report? report, DateTime now,
+        CancellationToken ct)
+    {
+        // Сценарий 1: Создание нового отчета
         if (report == null)
         {
-            // Создаём новый отчёт с текущей датой и ID пользователя.
+            // Инициализируем новый объект отчета
             report = new Report
             {
-                // Указываем ID пользователя, которому принадлежит отчёт.
+                // Устанавливаем связь с пользователем
                 UserId = request.User!.Id,
 
-                // Устанавливаем текущую дату для отчёта.
-                Date = timeAfterAnalyze,
+                // Фиксируем текущую дату
+                Date = now,
 
-                // Заполняем данные утреннего отчёта.
+                // Создаем утренний отчет
                 MorningReport = new UserReport
                 {
-                    // Данные отчёта, переданные в запросе.
+                    // Сохраняем текст отчета из запроса
                     Data = request.Report!,
 
-                    // Проверяем, просрочен ли утренний отчёт.
-                    Overdue = timeAfterAnalyze.MorningReportOverdue()
+                    // Проверяем просрочку отправки утреннего отчета
+                    Overdue = now.MorningReportOverdue()
                 }
             };
 
-            // Добавляем отчёт в базу данных.
-            await unitOfWork.AddAsync(report, cancellationToken);
+            // Добавляем новый отчет в контекст данных
+            await unitOfWork.AddAsync(report, ct);
         }
+        // Сценарий 2: Обновление существующего отчета
         else
         {
-            // Если отчёт за текущую дату уже существует, обновляем вечерний отчёт.
+            // Добавляем или обновляем вечерний отчет
             report.EveningReport = new UserReport
             {
-                // Данные отчёта, переданные в запросе.
+                // Сохраняем текст отчета из запроса
                 Data = request.Report!,
 
-                // Проверяем, просрочен ли вечерний отчёт.
-                Overdue = timeAfterAnalyze.EveningReportOverdue()
+                // Проверяем просрочку отправки вечернего отчета
+                Overdue = now.EveningReportOverdue()
             };
         }
 
-        // Если отчёт прошел проверку - обнуляем состояние текущего введенного отчёта
+        // Очищаем временное состояние текущего отчета пользователя
         request.User!.CurrentReport = null;
 
-        // Сохраняем изменения в базе данных.
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        // Фиксируем все изменения в базе данных
+        await unitOfWork.SaveChangesAsync(ct);
 
-        // Определяем сообщение об успешном сохранении в зависимости от времени.
-        if (report.EveningReport == null)
-        {
-            // Отправляем сообщение об успешном сохранении утреннего отчёта.
-            await client.SendMessage(
-                replyParameters: new ReplyParameters
-                {
-                    MessageId = request.MessageId
-                },
-                chatId: request.ChatId,
-                text: MorningSuccessMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: CancellationToken.None
-            );
+        // Возвращаем обновленный/созданный объект отчета
+        return report;
+    }
 
-            // Если утренний отчёт был просрочен, отправляем дополнительное уведомление.
-            if (report.MorningReport.Overdue.HasValue)
-            {
-                // Формируем сообщение о просрочке.
-                var overdueMessage =
-                    string.Format(MorningOverdueMessage, report.MorningReport.Overdue.FormatTimeSpan());
-
-                // Отправляем сообщение о просрочке.
-                await client.SendMessage(
-                    chatId: request.ChatId,
-                    text: overdueMessage,
-                    parseMode: ParseMode.Html,
-                    cancellationToken: CancellationToken.None
-                );
-            }
-
-            // Если сейчас время для сдачи вечернего отчёта
-            if (timeAfterAnalyze.IsEveningPeriod())
-            {
-                // Отправляем сообщение о необходимости сдать вечерний отчёт.
-                await client.SendMessage(
-                    chatId: request.ChatId,
-                    text: EveningReportDueMessage, // Используем константу с текстом сообщения
-                    parseMode: ParseMode.Html,
-                    cancellationToken: CancellationToken.None
-                );
-            }
-        }
-        else
-        {
-            // Отправляем сообщение об успешном сохранении вечернего отчёта.
-            await client.SendMessage(
-                replyParameters: new ReplyParameters
-                {
-                    MessageId = request.MessageId
-                },
-                chatId: request.ChatId,
-                text: EveningSuccessMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: CancellationToken.None
-            );
-
-            // Если вечерний отчёт был просрочен, отправляем дополнительное уведомление.
-            if (report.EveningReport.Overdue.HasValue)
-            {
-                // Формируем сообщение о просрочке.
-                var overdueMessage =
-                    string.Format(EveningOverdueMessage, report.EveningReport.Overdue.FormatTimeSpan());
-
-                // Отправляем сообщение о просрочке.
-                await client.SendMessage(
-                    chatId: request.ChatId,
-                    text: overdueMessage,
-                    parseMode: ParseMode.Html,
-                    cancellationToken: CancellationToken.None
-                );
-            }
-        }
-
-        // Получаем список ID администраторов
+    /// <summary>
+    /// Отправляет уведомления о сохранении отчёта пользователю и администраторам.
+    /// </summary>
+    /// <param name="request">Запрос с данными отчёта.</param>
+    /// <param name="report">Объект отчёта.</param>
+    private async Task NotifyAdminsAsync(AnalyzeReportCommand request, Report report)
+    {
+        // Получаем список администраторов
         var admins = await unitOfWork
             .Query<User>()
             .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
             .Select(u => u.Id)
             .ToListAsync(CancellationToken.None);
 
-        // Создаем список из чатов, которые необходимо уведомить о новом отчёте
+        // Формируем список чатов для уведомлений
         var chatsToNotify = admins
-            .Where(a => a != request.User.Id)
+            .Where(a => a != request.User!.Id)
             .Select(a => new ValueTuple<long, int?>(a, null))
             .ToList();
 
-        // Если у пользователя установлен рабочий чат - добавляем его в список чатов рассылки
+        // Добавляем рабочий чат пользователя, если он есть
         if (request.User!.WorkingChat != null)
         {
-            // Сохраняем рабочий чат в переменную
-            var workingChat = request.User.WorkingChat;
-
-            // Создаем новый кортеж
-            var tuple = new ValueTuple<long, int?>(workingChat.Id, workingChat.MessageThreadId);
-
-            // Добавляем кортеж в список
-            chatsToNotify.Add(tuple);
+            chatsToNotify.Add(new ValueTuple<long, int?>(
+                request.User.WorkingChat.Id,
+                request.User.WorkingChat.MessageThreadId));
         }
 
-        // Параллельно отправляем уведомления каждому администратору
+        // Параллельно отправляем уведомления администраторам
         await Parallel.ForEachAsync(chatsToNotify, options, async (chat, ct) =>
         {
             try
             {
-                // Отправляем сообщение администратору.
                 await client.SendMessage(
                     chatId: chat.Item1,
                     messageThreadId: chat.Item2,
@@ -479,25 +551,284 @@ public class AnalyzeReportCommandHandler(
                     cancellationToken: ct
                 );
             }
-            catch (ApiRequestException ex) // Ловим только ошибки Telegram API
+            catch (ApiRequestException ex)
             {
-                // Логируем ошибку, если не удалось отправить сообщение.
                 logger.LogWarning(ex, "Failed to send report submission notification to chat {ChatId}.", chat.Item1);
             }
         });
     }
 
     /// <summary>
-    /// Валидирует введённый отчёт.
+    /// Отправляет сообщение об успешном сохранении отчёта пользователю.
     /// </summary>
-    /// <param name="report">Введённый отчёт.</param>
-    /// <returns>True, если отчёт корректен, иначе false.</returns>
-    private static bool IsReportValid(string? report)
+    /// <param name="request">Запрос с данными отчёта.</param>
+    /// <param name="report">Объект отчёта.</param>
+    private async Task SendSuccessMessageToUserAsync(AnalyzeReportCommand request, Report report)
     {
-        // Проверка, что отчёт не пустой и не состоит только из пробелов
-        if (string.IsNullOrWhiteSpace(report)) return false;
+        if (report.EveningReport == null)
+        {
+            // Отправляем сообщение об успешном сохранении утреннего отчёта
+            await client.SendMessage(
+                replyParameters: new ReplyParameters { MessageId = request.MessageId },
+                chatId: request.ChatId,
+                text: MorningSuccessMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: CancellationToken.None
+            );
 
-        // Проверка, что длина отчёта не превышает 5000 символов
-        return report.Length <= 5000;
+            // Если утренний отчёт просрочен, отправляем уведомление
+            if (report.MorningReport.Overdue.HasValue)
+            {
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: string.Format(MorningOverdueMessage, report.MorningReport.Overdue.FormatTimeSpan()),
+                    parseMode: ParseMode.Html,
+                    cancellationToken: CancellationToken.None
+                );
+            }
+
+            // Если сейчас время вечернего отчёта, напоминаем о нём
+            if (dateTimeProvider.Now.IsEveningPeriod())
+            {
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: EveningReportDueMessage,
+                    parseMode: ParseMode.Html,
+                    cancellationToken: CancellationToken.None
+                );
+            }
+        }
+        else
+        {
+            // Отправляем сообщение об успешном сохранении вечернего отчёта
+            await client.SendMessage(
+                replyParameters: new ReplyParameters { MessageId = request.MessageId },
+                chatId: request.ChatId,
+                text: EveningSuccessMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: CancellationToken.None
+            );
+
+            // Если вечерний отчёт просрочен, отправляем уведомление
+            if (report.EveningReport.Overdue.HasValue)
+            {
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: string.Format(EveningOverdueMessage, report.EveningReport.Overdue.FormatTimeSpan()),
+                    parseMode: ParseMode.Html,
+                    cancellationToken: CancellationToken.None
+                );
+            }
+        }
+    }
+
+    /// <summary>
+    /// Отправляет мотивационные сообщения пользователю в зависимости от типа отчёта.
+    /// Определяет тип отчёта (утренний/вечерний) и вызывает соответствующие обработчики.
+    /// </summary>
+    /// <param name="request">Запрос с данными отчёта.</param>
+    /// <param name="report">Объект отчёта.</param>
+    /// <param name="ct">Токен отмены для асинхронных операций</param>
+    /// <returns>Task, представляющий асинхронную операцию отправки сообщений</returns>
+    private async Task SendMotivationalMessagesAsync(AnalyzeReportCommand request, Report report, CancellationToken ct)
+    {
+        // Проверяем включен ли модуль анализатора в конфигурации системы
+        if (!analyzerConfiguration.Enabled) return;
+
+        // Определяем тип отчёта по наличию вечернего отчёта
+        if (report.EveningReport == null)
+        {
+            try
+            {
+                // Отправка мотивационного сообщения
+                await SendMorningMotivationAsync(
+                    request,
+                    report.MorningReport.Data,
+                    ct);
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+        else
+        {
+            try
+            {
+                // Отправка похвалы за проделанную работу
+                await SendEveningPraiseAsync(
+                    request,
+                    report.EveningReport.Data,
+                    ct);
+            }
+            catch
+            {
+                // ignored
+            }
+
+            try
+            {
+                // Обновление рейтинга пользователя
+                await ProcessUserScoreAsync(
+                    request,
+                    report.EveningReport.Data,
+                    ct);
+            }
+            catch
+            {
+                //ignored
+            }
+        }
+    }
+
+    /// <summary>
+    /// Отправляет утренние мотивационные сообщения пользователю
+    /// </summary>
+    /// <param name="request">Контекст запроса</param>
+    /// <param name="reportData">Текст утреннего отчета</param>
+    /// <param name="ct">Токен отмены</param>
+    private async Task SendMorningMotivationAsync(AnalyzeReportCommand request, string reportData,
+        CancellationToken ct)
+    {
+        // Генерируем мотивацию на основе утреннего отчета
+        var motivation = reportAnalyzer.GenerateMorningMotivationAsync(reportData, ct);
+        await SendTypingWhileWaitingAsync(request, motivation, ct);
+
+        // Отправляем три типа сообщений последовательно:
+        // 1. Основная мотивация
+        await client.SendMessage(
+            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            chatId: request.ChatId,
+            text: motivation.Result.Motivation,
+            cancellationToken: ct
+        );
+
+        // 2. Рекомендации на день
+        await client.SendMessage(
+            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            chatId: request.ChatId,
+            text: motivation.Result.Recommendations,
+            cancellationToken: ct
+        );
+
+        // 3. Юмористическое завершение
+        await client.SendMessage(
+            chatId: request.ChatId,
+            text: motivation.Result.Humor,
+            cancellationToken: ct
+        );
+    }
+
+    /// <summary>
+    /// Отправляет вечерние похвалу и оценку пользователю
+    /// </summary>
+    /// <param name="request">Контекст запроса</param>
+    /// <param name="reportData">Текст утреннего отчета</param>
+    /// <param name="ct">Токен отмены</param>
+    private async Task SendEveningPraiseAsync(AnalyzeReportCommand request, string reportData,
+        CancellationToken ct)
+    {
+        // Генерируем похвалу на основе вечернего отчета
+        var praise = reportAnalyzer.GenerateEveningPraiseAsync(reportData, CancellationToken.None);
+        await SendTypingWhileWaitingAsync(request, praise, ct);
+
+        // Отправляем три типа сообщений:
+        // 1. Достижения за день
+        await client.SendMessage(
+            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            chatId: request.ChatId,
+            text: praise.Result.Achievements,
+            cancellationToken: ct
+        );
+
+        // 2. Похвалу за проделанную работу
+        await client.SendMessage(
+            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            chatId: request.ChatId,
+            text: praise.Result.Praise,
+            cancellationToken: ct
+        );
+
+        // 3. Юмористическое завершение дня
+        await client.SendMessage(
+            chatId: request.ChatId,
+            text: praise.Result.Humor,
+            cancellationToken: ct
+        );
+    }
+
+    /// <summary>
+    /// Обрабатывает начисление очков пользователю за вечерний отчет:
+    /// 1. Получает оценку отчета
+    /// 2. Начисляет очки
+    /// 3. Проверяет изменение звания
+    /// 4. Формирует отчет о прогрессе
+    /// </summary>
+    /// <param name="request">Данные запроса, включая пользователя и контекст чата</param>
+    /// <param name="reportData">Текст вечернего отчета для анализа</param>
+    /// <param name="ct">Токен отмены для асинхронных операций</param>
+    private async Task ProcessUserScoreAsync(AnalyzeReportCommand request, string reportData, CancellationToken ct)
+    {
+        // Запускаем асинхронную задачу для получения оценки отчета
+        var scoreTask = reportAnalyzer.GetScorePointsAsync(reportData, ct);
+
+        // Пока задача выполняется, периодически отправляем индикатор "печатает"
+        await SendTypingWhileWaitingAsync(request, scoreTask, ct);
+
+        // Получаем результат выполнения задачи - количество заработанных очков
+        var earnedScore = scoreTask.Result;
+
+        // Сохраняем текущее звание ДО начисления очков для последующего сравнения
+        var previousRank = request.User!.Rank;
+
+        // Начисляем очки, если они положительные
+        if (earnedScore > 0) request.User.Score += earnedScore;
+
+        // Получаем актуальное звание ПОСЛЕ начисления очков
+        var currentRank = request.User.Rank;
+
+        // Вычисляем сколько очков осталось до следующего звания
+        var pointsRemaining = request.User.PointsToNextRank;
+
+        // Запрос в БД для подсчета количества пользователей с меньшим рейтингом
+        var usersBehindCount = await unitOfWork.Query<User>()
+            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
+            .Where(u => u.Score < request.User.Score)
+            .CountAsync(ct);
+
+        // Формируем основное сообщение в зависимости от изменения звания
+        var statusMessage = previousRank == currentRank
+            ? $"📈 <b>Вы</b> ({currentRank}) стали ближе к новому званию!"
+            : $"🎉 Поздравляем с повышением до <b>{currentRank}!</b>";
+
+        // Формируем итоговое сообщение, подставляя данные в шаблон
+        var message = string.Format(RankProgressMessage,
+            statusMessage,
+            request.User.Score,
+            pointsRemaining,
+            usersBehindCount);
+
+        // Отправляем сформированное сообщение пользователю
+        await client.SendMessage(
+            chatId: request.ChatId,
+            text: message,
+            parseMode: ParseMode.Html,
+            cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// Отправляет статус "печатает" пока задача не завершена.
+    /// </summary>
+    /// <param name="request">Запрос с данными отчёта.</param>
+    /// <param name="task">Задача, за которой нужно следить.</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    private async Task SendTypingWhileWaitingAsync(AnalyzeReportCommand request, Task task,
+        CancellationToken ct)
+    {
+        while (!task.IsCompleted)
+        {
+            await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
+            await Task.Delay(5000, ct);
+        }
     }
 }

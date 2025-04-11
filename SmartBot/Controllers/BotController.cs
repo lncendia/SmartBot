@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.UpdateHandler;
 using Telegram.Bot.Types;
 
 namespace SmartBot.Controllers;

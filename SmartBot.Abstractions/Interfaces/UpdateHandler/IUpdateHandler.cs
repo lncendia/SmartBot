@@ -1,6 +1,6 @@
 using Telegram.Bot.Types;
 
-namespace SmartBot.Abstractions.Interfaces;
+namespace SmartBot.Abstractions.Interfaces.UpdateHandler;
 
 /// <summary>
 /// Интерфейс для обработки обновлений

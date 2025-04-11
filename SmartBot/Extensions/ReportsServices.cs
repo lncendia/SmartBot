@@ -5,6 +5,7 @@ using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
 using SmartBot.HostedServices;
 using SmartBot.Infrastructure.Services.DataExporter;
 using SmartBot.Infrastructure.Services.ReportAnalyzer;
+using SmartBot.Infrastructure.Services.ReportAnalyzer.Configuration;
 
 namespace SmartBot.Extensions;
 
@@ -26,11 +27,11 @@ public static class ReportsServices
         // Создаем конфигурацию для анализатора отчетов
         var analyzerConfiguration = new AnalyzerConfiguration
         {
-            // Получаем промпт для анализа отчетов из конфигурации
-            Prompt = configuration.GetRequiredValue<string>("Openrouter:Prompt"),
-
-            // Получаем название модели ИИ из конфигурации
             Model = configuration.GetRequiredValue<string>("Openrouter:Model"),
+            ReportAnalysisPrompt = configuration.GetRequiredValue<string>("ReportAnalysis:ReportAnalysisPrompt"),
+            MorningMotivationPrompt = configuration.GetRequiredValue<string>("ReportAnalysis:MorningMotivationPrompt"),
+            EveningPraisePrompt = configuration.GetRequiredValue<string>("ReportAnalysis:EveningPraisePrompt"),
+            ScorePointsPrompt = configuration.GetRequiredValue<string>("ReportAnalysis:ScorePointsPrompt")
         };
 
         // Создаем конфигурацию для анализа отчетов

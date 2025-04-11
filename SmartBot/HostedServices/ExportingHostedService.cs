@@ -1,8 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
-using SmartBot.Abstractions.Interfaces;
 using SmartBot.Abstractions.Interfaces.DataExporter;
+using SmartBot.Abstractions.Interfaces.Storage;
+using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models;
 using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Abstractions.Models.Users;
@@ -128,7 +129,10 @@ public class ExportingHostedService(
             var reports = await unitOfWork.Query<User>()
 
                 // Фильтруем пользователей, не являющихся администратороми
-                .Where(u => u.Role == Role.Employee)
+                .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
+                
+                // Фильтруем пользователей которые заполнили свои данные`
+                .Where(u => u.Position != null)
 
                 // Выполняем LEFT JOIN между таблицами User и Report
                 .GroupJoin(

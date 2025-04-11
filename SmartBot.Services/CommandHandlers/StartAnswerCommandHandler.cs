@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Abstractions.Models.Users;
 using SmartBot.Services.Extensions;

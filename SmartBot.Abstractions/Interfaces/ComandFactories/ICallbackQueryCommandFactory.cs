@@ -2,7 +2,7 @@
 using Telegram.Bot.Types;
 using User = SmartBot.Abstractions.Models.Users.User;
 
-namespace SmartBot.Abstractions.Interfaces;
+namespace SmartBot.Abstractions.Interfaces.ComandFactories;
 
 /// <summary>
 /// Интерфейс для создания команд на основе callback-запросов

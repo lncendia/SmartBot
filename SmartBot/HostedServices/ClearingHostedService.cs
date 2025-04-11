@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Extensions;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Infrastructure.Contexts;
 
 namespace SmartBot.HostedServices;

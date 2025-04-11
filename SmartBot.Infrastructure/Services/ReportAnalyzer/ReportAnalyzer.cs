@@ -2,6 +2,8 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
+using SmartBot.Abstractions.Interfaces.ReportAnalyzer.DTOs;
+using SmartBot.Infrastructure.Services.ReportAnalyzer.Configuration;
 using SmartBot.Infrastructure.Services.ReportAnalyzer.RequestModels;
 using SmartBot.Infrastructure.Services.ReportAnalyzer.ResponseModels;
 
@@ -13,7 +15,10 @@ namespace SmartBot.Infrastructure.Services.ReportAnalyzer;
 /// <param name="configuration">Конфигурация анализатора, содержащая модель и подсказку.</param>
 /// <param name="clientFactory">IHttpClientFactory для отправки HTTP-запросов.</param>
 /// <param name="logger">Логгер.</param>
-public class ReportAnalyzer(AnalyzerConfiguration configuration, IHttpClientFactory clientFactory, ILogger<ReportAnalyzer> logger) : IReportAnalyzer
+public class ReportAnalyzer(
+    AnalyzerConfiguration configuration,
+    IHttpClientFactory clientFactory,
+    ILogger<ReportAnalyzer> logger) : IReportAnalyzer
 {
     /// <summary>
     /// Имя HttpClient для фабрики.
@@ -21,145 +26,189 @@ public class ReportAnalyzer(AnalyzerConfiguration configuration, IHttpClientFact
     public const string HttpClientName = "openrouter";
 
     /// <summary>
-    /// Статическое поле, содержащее формат ответа, ожидаемый от API.
+    /// Базовый метод для выполнения запросов к API OpenRouter
     /// </summary>
-    private static readonly ResponseFormat ResponseFormat = new()
+    /// <typeparam name="TResponse">Тип модели ответа</typeparam>
+    /// <param name="requestModel">Модель запроса</param>
+    /// <param name="token">Токен отмены</param>
+    /// <returns>Результат обработки ответа API</returns>
+    private async Task<TResponse> ExecuteOpenRouterRequestAsync<TResponse>(
+        RequestModel requestModel,
+        CancellationToken token)
+        where TResponse : class
     {
-        // Тип формата ответа (JSON Schema)
-        Type = "json_schema",
-
-        // Схема JSON
-        JsonSchema = new JsonSchema
-        {
-            // Имя схемы
-            Name = "report",
-
-            // Строгая проверка схемы
-            Strict = true,
-
-            // Схема документа
-            Schema = new Schema
-            {
-                // Тип объекта в схеме
-                Type = "object",
-
-                // Поля
-                Properties = new Properties
-                {
-                    // Поле оценки
-                    Score = new Property
-                    {
-                        // Схема
-                        Type = "number",
-
-                        // Описание свойства
-                        Description = "Оценка исходного отчёта от 1 до 10"
-                    },
-
-                    // Поле измененного отчёта
-                    Edit = new Property
-                    {
-                        // Тип свойства "Edit" (строка)
-                        Type = "string",
-
-                        // Описание свойства
-                        Description = "Отредактированный отчёт"
-                    }
-                },
-
-                // Обязательные свойства
-                Required = ["score", "edit"],
-
-                // Запрет на дополнительные свойства
-                AdditionalProperties = false
-            }
-        }
-    };
-
-    /// <inheritdoc/>
-    /// <summary>
-    /// Асинхронный метод для анализа отчёта с использованием API OpenRouter.
-    /// </summary>
-    public async Task<ReportAnalyzeResult> AnalyzeAsync(string report, CancellationToken token)
-    {
-        // Создание модели запроса для отправки в API
-        var requestModel = new RequestModel
-        {
-            // Модель, указанная в конфигурации
-            Model = configuration.Model,
-
-            // Сообщение
-            Messages =
-            [
-                new Message
-                {
-                    // Роль сообщения (система)
-                    Role = "system",
-
-                    // Подсказка из конфигурации
-                    Content = configuration.Prompt
-                },
-                new Message
-                {
-                    // Роль сообщения (пользователь)
-                    Role = "user",
-
-                    // Текст отчёта для анализа
-                    Content = $"Обработай отчёт, рекомендации пронумеруй: {report}"
-                }
-            ],
-
-            // Формат ответа
-            ResponseFormat = ResponseFormat
-        };
-
-        // Сериализация модели запроса в JSON
+        // Сериализуем модель запроса в JSON
         var jsonContent = JsonSerializer.Serialize(requestModel);
 
-        // Создание HTTP-контента с JSON-данными
+        // Создаем HTTP-контент с JSON-данными
         var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-        // Создаем HttpClient
+        // Создаем HttpClient с помощью фабрики
         var client = clientFactory.CreateClient(HttpClientName);
 
-        // Отправка POST-запроса на API OpenRouter
+        // Отправляем POST-запрос на API OpenRouter
         var response = await client.PostAsync("/api/v1/chat/completions", httpContent, token);
 
-        // Проверка успешности запроса (выбросит исключение, если статус не 2xx)
+        // Проверяем успешность запроса (выбросит исключение при коде статуса не 2xx)
         response.EnsureSuccessStatusCode();
 
-        // Чтение ответа от API в виде строки
+        // Читаем ответ от API в виде строки
         var responseJson = await response.Content.ReadAsStringAsync(token);
 
         try
         {
+            // Находим индекс первого символа '{' - начало JSON-объекта
+            var jsonStart = responseJson.IndexOf('{');
 
-            // Десериализация JSON-ответа в объект OpenRouterResponse
-            var openRouterResponse = JsonSerializer.Deserialize<OpenRouterResponse>(responseJson);
+            // Находим индекс последнего символа '}' - конец JSON-объекта
+            var jsonEnd = responseJson.LastIndexOf('}');
 
-            // Извлечение содержимого ответа (message.content)
+            // Инициализируем переменную для очищенного JSON
+            // По умолчанию используем исходный текст, если не найдены границы
+            var cleanJson = responseJson;
+
+            // Проверяем что:
+            // 1. Найден символ начала '{' (индекс >= 0)
+            // 2. Найден символ конца '}' (индекс >= 0) 
+            // 3. Конец находится после начала (jsonEnd > jsonStart)
+            if (jsonStart >= 0 && jsonEnd >= 0 && jsonEnd > jsonStart)
+            {
+                // Вырезаем подстроку от начала до конца JSON-объекта включительно
+                // Длина подстроки = (индекс_конца - индекс_начала + 1)
+                cleanJson = responseJson.Substring(jsonStart, jsonEnd - jsonStart + 1);
+            }
+            
+            // Десериализуем JSON-ответ в промежуточный объект
+            var openRouterResponse = JsonSerializer.Deserialize<OpenRouterResponse>(cleanJson);
+
+            // Извлекаем содержимое ответа (message.content)
             var responseContent = openRouterResponse!.Choices.First().Message.Content;
 
-            // Десериализация содержимого ответа в объект Report
-            var aiResponse = JsonSerializer.Deserialize<Report>(responseContent);
+            // Десериализуем содержимое ответа в целевую модель
+            var aiResponse = JsonSerializer.Deserialize<TResponse>(responseContent);
 
-            // Возврат результата анализа
-            return new ReportAnalyzeResult
-            {
-                // Оценка отчёта
-                Score = aiResponse!.Score,
-
-                // Рекомендации по отчёту
-                Recommendations = aiResponse.Edit
-            };
+            // Преобразуем ответ API в конечный результат
+            return aiResponse!;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            // Логгируем информацию
-            logger.LogWarning("The Openrouter response could not be processed: {response}", responseJson);
-            
-            // Пробрасываем исключение дальше
+            // Логируем ошибку десериализации
+            logger.LogWarning(ex, "Failed to process OpenRouter response: {Response}", responseJson.Trim());
             throw;
         }
+    }
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// Анализирует отчет и возвращает структурированные результаты анализа
+    /// </summary>
+    public async Task<ReportAnalysisResult> AnalyzeReportAsync(string report, CancellationToken token)
+    {
+        // Создаем модель запроса для анализа отчета
+        var requestModel = new RequestModel
+        {
+            Model = configuration.Model,
+            Messages =
+            [
+                new Message { Role = "system", Content = configuration.ReportAnalysisPrompt },
+                new Message { Role = "user", Content = report }
+            ],
+            ResponseFormat = ResponseFormats.AnalyzeReportResponseFormat
+        };
+
+        // Выполняем запрос к API и получаем сырой ответ
+        var apiResponse = await ExecuteOpenRouterRequestAsync<ReportAnalysisResponse>(requestModel, token);
+
+        // Преобразуем ответ API в доменный объект
+        return new ReportAnalysisResult
+        {
+            Score = apiResponse.Score,
+            Recommendations = apiResponse.Edit
+        };
+    }
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// Генерирует утреннюю мотивацию на основе планов из отчета
+    /// </summary>
+    public async Task<MorningMotivationResult> GenerateMorningMotivationAsync(string report, CancellationToken token)
+    {
+        // Создаем модель запроса для генерации мотивации
+        var requestModel = new RequestModel
+        {
+            Model = configuration.Model,
+            Messages =
+            [
+                new Message { Role = "system", Content = configuration.MorningMotivationPrompt },
+                new Message { Role = "user", Content = report }
+            ],
+            ResponseFormat = ResponseFormats.MorningMotivationResponseFormat
+        };
+
+        // Выполняем запрос к API и получаем сырой ответ
+        var apiResponse = await ExecuteOpenRouterRequestAsync<MorningMotivationResponse>(requestModel, token);
+
+        // Преобразуем ответ API в доменный объект
+        return new MorningMotivationResult
+        {
+            Recommendations = apiResponse.Recommendations,
+            Motivation = apiResponse.Motivation,
+            Humor = apiResponse.Humor
+        };
+    }
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// Генерирует вечернюю оценку выполненной работы
+    /// </summary>
+    public async Task<EveningPraiseResult> GenerateEveningPraiseAsync(string report, CancellationToken token)
+    {
+        // Создаем модель запроса для генерации оценки
+        var requestModel = new RequestModel
+        {
+            Model = configuration.Model,
+            Messages =
+            [
+                new Message { Role = "system", Content = configuration.EveningPraisePrompt },
+                new Message { Role = "user", Content = report }
+            ],
+            ResponseFormat = ResponseFormats.EveningPraiseResponseFormat
+        };
+
+        // Выполняем запрос к API и получаем сырой ответ
+        var apiResponse = await ExecuteOpenRouterRequestAsync<EveningPraiseResponse>(requestModel, token);
+
+        // Преобразуем ответ API в доменный объект
+        return new EveningPraiseResult
+        {
+            Achievements = apiResponse.Achievements,
+            Praise = apiResponse.Praise,
+            Humor = apiResponse.Humor
+        };
+    }
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// Вычисляет балльную оценку эффективности работы
+    /// </summary>
+    public async Task<double> GetScorePointsAsync(string report, CancellationToken token)
+    {
+        // Создаем модель запроса для оценки эффективности
+        var requestModel = new RequestModel
+        {
+            Model = configuration.Model,
+            Messages =
+            [
+                new Message { Role = "system", Content = configuration.ScorePointsPrompt },
+                new Message { Role = "user", Content = report }
+            ],
+            ResponseFormat = ResponseFormats.ScorePointsResponseFormat
+        };
+
+        // Выполняем запрос к API и получаем сырой ответ
+        var apiResponse = await ExecuteOpenRouterRequestAsync<ScorePointsResponse>(requestModel, token);
+
+        // Возвращаем числовую оценку эффективности
+        return apiResponse.Score;
     }
 }

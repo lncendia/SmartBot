@@ -1,10 +1,12 @@
-﻿using SmartBot.Abstractions.Commands.Abstractions;
+﻿using SmartBot.Abstractions.Attributes;
+using SmartBot.Abstractions.Commands.Abstractions;
 
 namespace SmartBot.Abstractions.Commands;
     
 /// <summary>
 /// Команда для анализа отчета
 /// </summary>
+[AsyncCommand]
 public class AnalyzeReportCommand : TelegramCommand
 {
     /// <summary>

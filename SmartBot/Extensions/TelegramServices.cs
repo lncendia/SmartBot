@@ -1,8 +1,9 @@
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.ComandFactories;
+using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.HostedServices;
 using SmartBot.Services.Services;
 using Telegram.Bot;
-using IUpdateHandler = SmartBot.Abstractions.Interfaces.IUpdateHandler;
+using IUpdateHandler = SmartBot.Abstractions.Interfaces.UpdateHandler.IUpdateHandler;
 
 namespace SmartBot.Extensions;
 

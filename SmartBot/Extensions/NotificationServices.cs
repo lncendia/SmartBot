@@ -1,4 +1,4 @@
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Notification;
 using SmartBot.HostedServices;
 using SmartBot.Services.Services;
 

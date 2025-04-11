@@ -1,9 +1,9 @@
-﻿namespace SmartBot.Abstractions.Interfaces.ReportAnalyzer;
+﻿namespace SmartBot.Abstractions.Interfaces.ReportAnalyzer.DTOs;
 
 /// <summary>
 /// Результат анализа отчета
 /// </summary>
-public class ReportAnalyzeResult
+public class ReportAnalysisResult
 {
     /// <summary>
     /// Оценка отчета

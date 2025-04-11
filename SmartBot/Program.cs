@@ -16,11 +16,11 @@ builder.Services.AddTelegramServices(builder.Configuration);
 // Добавляем сервисы анализа отчётов
 builder.Services.AddReportsServices(builder.Configuration);
 
+// Добавление служб медиатора
+builder.Services.AddMediatorServices(builder.Configuration);
+
 // Добавляем сервисы рассылки уведомлений
 builder.Services.AddNotificationServices();
-
-// Добавление служб медиатора
-builder.Services.AddMediatorServices();
 
 // Регистрация контроллеров с поддержкой сериализации JSON
 builder.Services.AddControllers();

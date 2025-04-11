@@ -1,6 +1,6 @@
 ﻿using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.ComandFactories;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using IRequest = MediatR.IRequest;

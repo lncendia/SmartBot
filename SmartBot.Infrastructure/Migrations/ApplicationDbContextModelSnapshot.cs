@@ -83,6 +83,9 @@ namespace SmartBot.Infrastructure.Migrations
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
 
+                    b.Property<double>("Score")
+                        .HasColumnType("REAL");
+
                     b.Property<long?>("SelectedWorkingChatId")
                         .HasColumnType("INTEGER");
 

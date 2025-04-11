@@ -1,7 +1,7 @@
 ﻿using MediatR;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Services.Extensions;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;

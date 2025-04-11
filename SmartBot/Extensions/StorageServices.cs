@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Infrastructure.Contexts;
 using SmartBot.Infrastructure.Services;
 

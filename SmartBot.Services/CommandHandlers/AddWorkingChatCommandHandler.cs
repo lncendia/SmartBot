@@ -1,7 +1,7 @@
 ﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Commands;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Abstractions.Models.WorkingChats;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;

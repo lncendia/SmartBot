@@ -1,5 +1,6 @@
 ﻿using MediatR;
 using SmartBot.Abstractions.Commands;
+using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Services.Extensions;
 using Telegram.Bot;
 
@@ -10,7 +11,7 @@ namespace SmartBot.Services.CommandHandlers;
 /// </summary>
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="sender">Отправитель команд.</param>
-public class RepeatReportAnalysisCommandHandler(ISender sender, ITelegramBotClient client)
+public class RepeatReportAnalysisCommandHandler(IAsyncSender sender, ITelegramBotClient client)
     : IRequestHandler<RepeatReportAnalysisCommand>
 {
     /// <summary>

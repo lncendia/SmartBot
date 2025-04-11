@@ -17,7 +17,7 @@ public class Schema
     /// Свойства объекта.
     /// </summary>
     [JsonPropertyName("properties")]
-    public required Properties Properties { get; init; }
+    public required Dictionary<string, Property> Properties { get; init; }
 
     /// <summary>
     /// Обязательные свойства объекта.

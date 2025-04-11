@@ -1,4 +1,4 @@
-﻿namespace SmartBot.Abstractions.Interfaces;
+﻿namespace SmartBot.Abstractions.Interfaces.Utils;
 
 /// <summary>
 /// Интерфейс для синхронизации пользователей

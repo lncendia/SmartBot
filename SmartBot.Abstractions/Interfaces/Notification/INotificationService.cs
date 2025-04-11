@@ -1,4 +1,4 @@
-﻿namespace SmartBot.Abstractions.Interfaces;
+﻿namespace SmartBot.Abstractions.Interfaces.Notification;
 
 /// <summary>
 /// Интерфейс для уведомлений о событиях, связанных с отчётами.

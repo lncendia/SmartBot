@@ -2,8 +2,12 @@ using System.Diagnostics.CodeAnalysis;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SmartBot.Abstractions.Attributes;
 using SmartBot.Abstractions.Enums;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.ComandFactories;
+using SmartBot.Abstractions.Interfaces.Storage;
+using SmartBot.Abstractions.Interfaces.UpdateHandler;
+using SmartBot.Abstractions.Interfaces.Utils;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using User = SmartBot.Abstractions.Models.Users.User;
@@ -21,9 +25,14 @@ public class UpdateHandler : IUpdateHandler
     private readonly ILogger<UpdateHandler> _logger;
 
     /// <summary>
-    /// Отправитель команд.
+    /// Базовый отправитель команд для синхронной обработки
     /// </summary>
     private readonly ISender _sender;
+    
+    /// <summary>
+    /// Асинхронный отправитель команд для фоновой обработки
+    /// </summary>
+    private readonly IAsyncSender _asyncSender;
 
     /// <summary>
     /// Фабрика для создания команд на основе сообщений.
@@ -48,18 +57,21 @@ public class UpdateHandler : IUpdateHandler
     /// <param name="messageCommandFactory">Фабрика для создания команд на основе сообщений.</param>
     /// <param name="callbackQueryCommandFactory">Фабрика для создания команд на основе callback-запросов.</param>
     /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
+    /// <param name="asyncSender">Асинхронный отправитель для фоновой обработки</param>
     public UpdateHandler(
         ILogger<UpdateHandler> logger,
         ISender sender,
         IMessageCommandFactory messageCommandFactory,
         ICallbackQueryCommandFactory callbackQueryCommandFactory,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork, 
+        IAsyncSender asyncSender)
     {
         _logger = logger;
         _sender = sender;
         _messageCommandFactory = messageCommandFactory;
         _callbackQueryCommandFactory = callbackQueryCommandFactory;
         _unitOfWork = unitOfWork;
+        _asyncSender = asyncSender;
     }
 
     /// <summary>
@@ -128,7 +140,7 @@ public class UpdateHandler : IUpdateHandler
         if (command == null) return;
 
         // Отправляем команду
-        await _sender.Send(command, cancellationToken);
+        await SendCommandAsync(command, cancellationToken);
     }
 
     /// <summary>
@@ -156,6 +168,29 @@ public class UpdateHandler : IUpdateHandler
         if (command == null) return;
 
         // Отправляем команду
-        await _sender.Send(command, cancellationToken);
+        await SendCommandAsync(command, cancellationToken);
+    }
+
+
+    /// <summary>
+    /// Отправляет команду на обработку, определяя синхронный или асинхронный способ выполнения
+    /// на основе наличия атрибута <see cref="AsyncCommandAttribute"/> у запроса.
+    /// </summary>
+    /// <param name="request">Команда или запрос для обработки</param>
+    /// <param name="token">Токен отмены операции</param>
+    /// <returns>Задача, представляющая асинхронную операцию отправки</returns>
+    /// <remarks>
+    /// Если запрос помечен атрибутом <see cref="AsyncCommandAttribute"/>, он будет обработан
+    /// асинхронным отправителем через очередь. Обычные запросы обрабатываются синхронно.
+    /// </remarks>
+    private Task SendCommandAsync(IRequest request, CancellationToken token)
+    {
+        // Получаем все атрибуты типа запроса
+        var attributes = request.GetType().GetCustomAttributes(false);
+
+        // Проверяем наличие атрибута AsyncCommandAttribute
+        return attributes.Any(a => a.GetType() == typeof(AsyncCommandAttribute)) 
+            ? _asyncSender.Send(request, token)  // Асинхронная обработка через очередь
+            : _sender.Send(request, token);     // Синхронная обработка
     }
 }

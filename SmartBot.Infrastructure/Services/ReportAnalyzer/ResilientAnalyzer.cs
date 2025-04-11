@@ -5,6 +5,7 @@ using Polly.CircuitBreaker;
 using Polly.Retry;
 using Polly.Timeout;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
+using SmartBot.Abstractions.Interfaces.ReportAnalyzer.DTOs;
 
 namespace SmartBot.Infrastructure.Services.ReportAnalyzer;
 
@@ -154,32 +155,89 @@ public class ResilientAnalyzer : IReportAnalyzer
             .Build();
     }
 
+    /// <summary>
+    /// Базовый метод для выполнения операций через отказоустойчивый пайплайн
+    /// </summary>
+    /// <typeparam name="TResult">Тип возвращаемого результата</typeparam>
+    /// <param name="operation">Асинхронная операция для выполнения</param>
+    /// <param name="operationName">Наименование операции для логирования</param>
+    /// <param name="ct">Токен отмены</param>
+    /// <returns>Результат выполнения операции</returns>
+    private async Task<TResult> ExecuteWithResilienceAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> operation,
+        string operationName,
+        CancellationToken ct = default)
+    {
+        // Выполняем операцию через политику пайплайна
+        var result = await _pipeline.ExecuteAsync(async token =>
+            {
+                try
+                {
+                    // Выполняем целевую операцию
+                    return await operation(token);
+                }
+                catch (Exception ex)
+                {
+                    // Логируем ошибку с указанием имени операции
+                    _logger.LogError(ex, "{Operation} завершилась с ошибкой", operationName);
+                    throw;
+                }
+            },
+            ct);
+
+        // Возвращаем результат выполнения
+        return result;
+    }
+
     /// <inheritdoc/>
     /// <summary>
-    /// Анализирует отчет с использованием отказоустойчивого пайплайна.
+    /// Анализирует отчет с использованием отказоустойчивого пайплайна
     /// </summary>
-    public async Task<ReportAnalyzeResult> AnalyzeAsync(string report, CancellationToken cancellationToken = default)
+    public Task<ReportAnalysisResult> AnalyzeReportAsync(string report, CancellationToken ct = default)
     {
-        // Выполняем запрос через пайплайн с отказоустойчивостью
-        var result = await _pipeline.ExecuteAsync(Pipeline, cancellationToken);
+        // Вызываем базовый метод с конкретной операцией
+        return ExecuteWithResilienceAsync(
+            async token => await _analyzer.AnalyzeReportAsync(report, token),
+            "Анализ отчета",
+            ct);
+    }
 
-        // Возвращаем результат анализа
-        return result;
+    /// <inheritdoc/>
+    /// <summary>
+    /// Генерирует утреннюю мотивацию на основе отчета
+    /// </summary>
+    public Task<MorningMotivationResult> GenerateMorningMotivationAsync(string report, CancellationToken ct = default)
+    {
+        // Вызываем базовый метод с конкретной операцией
+        return ExecuteWithResilienceAsync(
+            async token => await _analyzer.GenerateMorningMotivationAsync(report, token),
+            "Генерация утренней мотивации",
+            ct);
+    }
 
-        // Функция для выполнения
-        async ValueTask<ReportAnalyzeResult> Pipeline(CancellationToken token)
-        {
-            try
-            {
-                // Выполняем анализ отчёта
-                return await _analyzer.AnalyzeAsync(report, token);
-            }
-            catch (Exception e)
-            {
-                // Логгируем исключение
-                _logger.LogError(e, "Failed to analyze the report.");
-                throw;
-            }
-        }
+    /// <inheritdoc/>
+    /// <summary>
+    /// Формирует вечернюю оценку выполненной работы
+    /// </summary>
+    public Task<EveningPraiseResult> GenerateEveningPraiseAsync(string report, CancellationToken ct = default)
+    {
+        // Вызываем базовый метод с конкретной операцией
+        return ExecuteWithResilienceAsync(
+            async token => await _analyzer.GenerateEveningPraiseAsync(report, token),
+            "Генерация вечерней оценки",
+            ct);
+    }
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// Вычисляет балльную оценку эффективности работы
+    /// </summary>
+    public Task<double> GetScorePointsAsync(string report, CancellationToken ct = default)
+    {
+        // Вызываем базовый метод с конкретной операцией
+        return ExecuteWithResilienceAsync(
+            async token => await _analyzer.GetScorePointsAsync(report, token),
+            "Расчет баллов эффективности",
+            ct);
     }
 }

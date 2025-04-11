@@ -1,5 +1,6 @@
 ﻿using SmartBot.Abstractions.Extensions;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Notification;
+using SmartBot.Abstractions.Interfaces.Utils;
 
 namespace SmartBot.HostedServices;
 

@@ -1,4 +1,4 @@
-﻿namespace SmartBot.Abstractions.Interfaces;
+﻿namespace SmartBot.Abstractions.Interfaces.Storage;
 
 /// <summary>
 /// Интерфейс для работы с единицей работы (Unit of Work)

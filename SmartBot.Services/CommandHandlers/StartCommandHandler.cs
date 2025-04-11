@@ -1,6 +1,6 @@
 ﻿using MediatR;
 using SmartBot.Abstractions.Commands;
-using SmartBot.Abstractions.Interfaces;
+using SmartBot.Abstractions.Interfaces.Storage;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
