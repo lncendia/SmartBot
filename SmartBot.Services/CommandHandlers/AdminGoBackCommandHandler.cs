@@ -75,18 +75,11 @@ public class AdminGoBackCommandHandler(ITelegramBotClient client, IUnitOfWork un
         }
 
         // Отправляем сообщение с ReplyKeyboardRemove, чтобы убрать клавиатуру
-        var message = await client.SendMessage(
+        await client.SendMessage(
             chatId: request.ChatId,
             text: "<i>Убираю клавиатуру...</i>",
             parseMode: ParseMode.Html,
             replyMarkup: new ReplyKeyboardRemove(),
-            cancellationToken: CancellationToken.None
-        );
-
-        // Удаляем служебное сообщение, которое убрало клавиатуру
-        await client.DeleteMessage(
-            chatId: request.ChatId,
-            messageId: message.MessageId,
             cancellationToken: CancellationToken.None
         );
     }

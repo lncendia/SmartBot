@@ -189,8 +189,7 @@ public class AnalyzeReportCommandHandler(
         if (!await ValidateReportAsync(request, ct)) return;
 
         // Получаем текущее время с поправкой на часовой пояс
-        // TODO: Вынести часовой пояс в конфигурацию
-        var now = dateTimeProvider.Now.AddHours(-5);
+        var now = dateTimeProvider.Now;
 
         // Проверяем временные ограничения:
         // - рабочие часы для отправки отчётов

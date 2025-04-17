@@ -52,8 +52,8 @@ public class ResilientAnalyzer : IReportAnalyzer
             // Добавляем стратегию обработки таймаутов
             .AddTimeout(new TimeoutStrategyOptions
             {
-                // Генератор таймаута: 40 секунд
-                TimeoutGenerator = static _ => new ValueTask<TimeSpan>(TimeSpan.FromSeconds(40)),
+                // Генератор таймаута: 2 минуты
+                TimeoutGenerator = static _ => new ValueTask<TimeSpan>(TimeSpan.FromMinutes(2)),
 
                 // Действие при срабатывании таймаута
                 OnTimeout = _ =>
@@ -112,7 +112,7 @@ public class ResilientAnalyzer : IReportAnalyzer
                 FailureRatio = 0.2,
 
                 // Продолжительность временного окна для анализа частоты ошибок
-                SamplingDuration = TimeSpan.FromMinutes(1),
+                SamplingDuration = TimeSpan.FromMinutes(5),
 
                 // Минимальное количество запросов, необходимое для анализа частоты ошибок
                 MinimumThroughput = 10,
