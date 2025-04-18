@@ -464,7 +464,7 @@ public class SendReportWithoutAnalysisCommandHandler(
         {
             // Отправляем сообщение об успешном сохранении утреннего отчёта
             await client.SendMessage(
-                replyParameters: new ReplyParameters { MessageId = request.MessageId },
+                replyParameters: new ReplyParameters { MessageId = request.ReportMessageId },
                 chatId: request.ChatId,
                 text: MorningSuccessMessage,
                 parseMode: ParseMode.Html,
@@ -497,7 +497,7 @@ public class SendReportWithoutAnalysisCommandHandler(
         {
             // Отправляем сообщение об успешном сохранении вечернего отчёта
             await client.SendMessage(
-                replyParameters: new ReplyParameters { MessageId = request.MessageId },
+                replyParameters: new ReplyParameters { MessageId = request.ReportMessageId },
                 chatId: request.ChatId,
                 text: EveningSuccessMessage,
                 parseMode: ParseMode.Html,
@@ -593,7 +593,7 @@ public class SendReportWithoutAnalysisCommandHandler(
         // Отправляем три типа сообщений последовательно:
         // 1. Основная мотивация
         await client.SendMessage(
-            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            replyParameters: new ReplyParameters { MessageId = request.ReportMessageId },
             chatId: request.ChatId,
             text: motivation.Result.Motivation,
             cancellationToken: ct
@@ -607,7 +607,7 @@ public class SendReportWithoutAnalysisCommandHandler(
 
         // 2. Рекомендации на день
         await client.SendMessage(
-            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            replyParameters: new ReplyParameters { MessageId = request.ReportMessageId },
             chatId: request.ChatId,
             text: motivation.Result.Recommendations,
             cancellationToken: ct
@@ -643,7 +643,7 @@ public class SendReportWithoutAnalysisCommandHandler(
         // Отправляем три типа сообщений:
         // 1. Достижения за день
         await client.SendMessage(
-            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            replyParameters: new ReplyParameters { MessageId = request.ReportMessageId },
             chatId: request.ChatId,
             text: praise.Result.Achievements,
             cancellationToken: ct
@@ -657,7 +657,7 @@ public class SendReportWithoutAnalysisCommandHandler(
 
         // 2. Похвалу за проделанную работу
         await client.SendMessage(
-            replyParameters: new ReplyParameters { MessageId = request.MessageId },
+            replyParameters: new ReplyParameters { MessageId = request.ReportMessageId },
             chatId: request.ChatId,
             text: praise.Result.Praise,
             cancellationToken: ct
