@@ -55,25 +55,25 @@ public class NotificationHostedService(
         // Получаем текущее время.
         var now = dateTimeProvider.Now;
 
-        // Устанавливаем таймер для утреннего уведомления (9:00).
-        _morningReportTimer = CreateTimer(now, TimeSpan.FromHours(9), NotifyMorningReportDueAsync);
+        // Устанавливаем таймер для утреннего уведомления (8:00).
+        _morningReportTimer = CreateTimer(now, TimeSpan.FromHours(8), NotifyMorningReportDueAsync);
 
-        // Устанавливаем таймер для уведомления о дедлайне утреннего отчёта (9:30).
+        // Устанавливаем таймер для уведомления о дедлайне утреннего отчёта (9:00).
         _morningDeadlineTimer =
-            CreateTimer(now, TimeSpan.FromHours(9, 30), NotifyMorningReportDeadlineApproachingAsync);
+            CreateTimer(now, TimeSpan.FromHours(9), NotifyMorningReportDeadlineApproachingAsync);
 
         // Устанавливаем таймер для уведомления о несдаче утреннего отчёта (10:00).
         _morningMissedTimer = CreateTimer(now, TimeSpan.FromHours(10), NotifyMorningReportMissedAsync);
 
-        // Устанавливаем таймер для вечернего уведомления (18:00).
-        _eveningReportTimer = CreateTimer(now, TimeSpan.FromHours(18), NotifyEveningReportDueAsync);
+        // Устанавливаем таймер для вечернего уведомления (17:00).
+        _eveningReportTimer = CreateTimer(now, TimeSpan.FromHours(17), NotifyEveningReportDueAsync);
 
-        // Устанавливаем таймер для уведомления о дедлайне вечернего отчёта (18:30).
+        // Устанавливаем таймер для уведомления о дедлайне вечернего отчёта (19:00).
         _eveningDeadlineTimer =
-            CreateTimer(now, TimeSpan.FromHours(18, 30), NotifyEveningReportDeadlineApproachingAsync);
+            CreateTimer(now, TimeSpan.FromHours(19), NotifyEveningReportDeadlineApproachingAsync);
 
-        // Устанавливаем таймер для уведомления о несдаче вечернего отчёта (19:00).
-        _eveningMissedTimer = CreateTimer(now, TimeSpan.FromHours(19), NotifyEveningReportMissedAsync);
+        // Устанавливаем таймер для уведомления о несдаче вечернего отчёта (20:00).
+        _eveningMissedTimer = CreateTimer(now, TimeSpan.FromHours(20), NotifyEveningReportMissedAsync);
 
         // Возвращаем завершенный Task, так как метод синхронный.
         return Task.CompletedTask;

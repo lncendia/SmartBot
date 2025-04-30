@@ -6,25 +6,25 @@
 public static class DateTimeExtensions
 {
     /// <summary>
-    /// Проверяет, является ли текущее время рабочим (с 9:00 до 22:00) и не выходным днём.
+    /// Проверяет, является ли текущее время рабочим (с 8:00) и не выходным днём.
     /// </summary>
     /// <param name="dateTime">Дата и время для проверки.</param>
     /// <returns>true, если время является рабочим; в противном случае — false.</returns>
     public static bool IsWorkingPeriod(this DateTime dateTime)
     {
-        // Проверяем, что время находится в диапазоне с 9:00 до 22:00 и это не выходной день.
-        return dateTime.Hour >= 9 && !dateTime.IsWeekend();
+        // Проверяем, что время находится в диапазоне с 8:00 и это не выходной день.
+        return dateTime.Hour >= 8 && !dateTime.IsWeekend();
     }
 
     /// <summary>
-    /// Проверяет, является ли текущее время подходящим для вечернего отчёта (с 18:00).
+    /// Проверяет, является ли текущее время подходящим для вечернего отчёта (с 17:00).
     /// </summary>
     /// <param name="dateTime">Дата и время для проверки.</param>
     /// <returns>true, если время подходит для вечернего отчёта; в противном случае — false.</returns>
     public static bool IsEveningPeriod(this DateTime dateTime)
     {
-        // Проверяем, что время больше или равно 18:00.
-        return dateTime.Hour >= 18;
+        // Проверяем, что время больше или равно 17:00.
+        return dateTime.Hour >= 17;
     }
 
     /// <summary>
@@ -46,21 +46,21 @@ public static class DateTimeExtensions
     }
 
     /// <summary>
-    /// Проверяет, просрочен ли вечерний отчёт (дедлайн — 19:00).
-    /// Если текущее время позже 19:00, возвращает время, на которое отчёт был просрочен.
+    /// Проверяет, просрочен ли вечерний отчёт (дедлайн — 20:00).
+    /// Если текущее время позже 20:00, возвращает время, на которое отчёт был просрочен.
     /// </summary>
     /// <param name="dateTime">Дата и время для проверки.</param>
     /// <returns>
-    /// null, если время до 19:00 (отчёт не просрочен);
+    /// null, если время до 20:00 (отчёт не просрочен);
     /// иначе — время, на которое отчёт был просрочен.
     /// </returns>
     public static TimeSpan? EveningReportOverdue(this DateTime dateTime)
     {
-        // Если время до 19:00, отчёт не просрочен.
-        if (dateTime.Hour < 19) return null;
+        // Если время до 20:00, отчёт не просрочен.
+        if (dateTime.Hour < 20) return null;
 
-        // Возвращаем разницу между текущим временем и 19:00.
-        return dateTime - dateTime.Date.AddHours(19);
+        // Возвращаем разницу между текущим временем и 20:00.
+        return dateTime - dateTime.Date.AddHours(20);
     }
 
     /// <summary>
