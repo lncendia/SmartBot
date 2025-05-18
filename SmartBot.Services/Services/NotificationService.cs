@@ -4,10 +4,13 @@ using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces.Notification;
 using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Abstractions.Interfaces.Utils;
+using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Abstractions.Models.Users;
+using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 
 // ReSharper disable InconsistentNaming
 
@@ -127,7 +130,7 @@ public class NotificationService(
             .ToListAsync(cancellationToken);
 
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт
-        await SendMessagesAsync(users, MorningReportMessage, cancellationToken);
+        await SendMessagesAsync(users, MorningReportMessage, cancellationToken: cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -160,7 +163,7 @@ public class NotificationService(
             .ToListAsync(cancellationToken);
 
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт
-        await SendMessagesAsync(users, MorningDeadlineApproachingMessage, cancellationToken);
+        await SendMessagesAsync(users, MorningDeadlineApproachingMessage, cancellationToken: cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -193,7 +196,7 @@ public class NotificationService(
             .ToListAsync(cancellationToken);
 
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт
-        await SendMessagesAsync(users, MorningReportMissedMessage, cancellationToken);
+        await SendMessagesAsync(users, MorningReportMissedMessage, cancellationToken: cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -244,10 +247,12 @@ public class NotificationService(
             .ToListAsync(cancellationToken);
 
         // Отправляем сообщения пользователям, которые сдали утренний отчёт.
-        await SendMessagesAsync(usersWithMorningReport, EveningReportMessage_MorningDone, cancellationToken);
+        await SendMessagesAsync(usersWithMorningReport, EveningReportMessage_MorningDone,
+            cancellationToken: cancellationToken);
 
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт.
-        await SendMessagesAsync(usersWithoutMorningReport, EveningReportMessage_MorningMissed, cancellationToken);
+        await SendMessagesAsync(usersWithoutMorningReport, EveningReportMessage_MorningMissed,
+            cancellationToken: cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -299,11 +304,11 @@ public class NotificationService(
 
         // Отправляем сообщения пользователям, которые сдали утренний отчёт
         await SendMessagesAsync(usersWithMorningReport, EveningDeadlineApproachingMessage_MorningDone,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт
         await SendMessagesAsync(usersWithoutMorningReport, EveningDeadlineApproachingMessage_MorningMissed,
-            cancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -354,41 +359,185 @@ public class NotificationService(
             .ToListAsync(cancellationToken);
 
         // Отправляем сообщения пользователям, которые сдали утренний отчёт
-        await SendMessagesAsync(usersWithMorningReport, EveningReportMissedMessage_MorningDone, cancellationToken);
+        await SendMessagesAsync(usersWithMorningReport, EveningReportMissedMessage_MorningDone,
+            cancellationToken: cancellationToken);
 
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт
-        await SendMessagesAsync(usersWithoutMorningReport, EveningReportMissedMessage_MorningMissed, cancellationToken);
+        await SendMessagesAsync(usersWithoutMorningReport, EveningReportMissedMessage_MorningMissed,
+            cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Сообщение для администратора о новом отчёте пользователя.
+    /// Содержит имя пользователя и текст отчёта, а также приглашение оставить комментарий.
+    /// </summary>
+    private const string ReportHandSubmissionMessage =
+        "📄 <b>Новый отчёт от пользователя</b> <i>{0}</i>\n" +
+        "🧑‍🏭 <b>Должность:</b> <i>{1}</i>\n\n" +
+        "🧑‍🏭 <b>Проверил:</b> <i>{2} ({3})</i>\n\n" +
+        "👇 <b>Текст отчёта:</b>\n" +
+        "<blockquote>{4}</blockquote>\n\n" +
+        "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
+
+    /// <summary>
+    /// Сообщение для администратора о новом отчёте пользователя.
+    /// Содержит имя пользователя и текст отчёта, а также приглашение оставить комментарий.
+    /// </summary>
+    private const string ReportSystemSubmissionMessage =
+        "📄 <b>Новый отчёт от пользователя</b> <i>{0}</i>\n" +
+        "🧑‍🏭 <b>Должность:</b> <i>{1}</i>\n\n" +
+        "🧑‍🏭 <b>Принят автоматически</b>\n\n" +
+        "👇 <b>Текст отчёта:</b>\n" +
+        "<blockquote>{2}</blockquote>\n\n" +
+        "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
+
+    /// <summary>
+    /// Сообщение для администратора о новом отчёте пользователя.
+    /// Содержит имя пользователя и текст отчёта, а также приглашение оставить комментарий.
+    /// </summary>
+    private const string ReportAnalyzerSubmissionMessage =
+        "📄 <b>Новый отчёт от пользователя</b> <i>{0}</i>\n" +
+        "🧑‍🏭 <b>Должность:</b> <i>{1}</i>\n\n" +
+        "🧑‍🏭 <b>Проверен анализатором отчётов</b>\n\n" +
+        "👇 <b>Текст отчёта:</b>\n" +
+        "<blockquote>{2}</blockquote>\n\n" +
+        "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
+
+    /// <summary>
+    /// Отправляет уведомления о сохранении отчёта пользователю и администраторам.
+    /// </summary>
+    /// <param name="request">Запрос с данными отчёта.</param>
+    /// <param name="report">Объект отчёта.</param>
+    /// <param name="reportText">Текст отчёта.</param>
+    public async Task NotifyNewRepostAsync(Report report, User? reviewer, CancellationToken token = default)
+    {
+        // Если навигационное свойство не указано
+        if (report.User == null) throw new ArgumentException("Please set the User navigation property in the Report");
+
+        // Получаем список администраторов
+        var admins = await unitOfWork
+            .Query<User>()
+            .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
+            .Select(u => u.Id)
+            .ToListAsync(CancellationToken.None);
+
+        // Формируем список чатов для уведомлений
+        var chatsToNotify = admins
+            .Where(a => a != report.User!.Id)
+            .Where(a => a != reviewer?.Id)
+            .Select(a => new ValueTuple<long, int?>(a, null))
+            .ToList();
+
+        // Добавляем рабочий чат пользователя, если он есть
+        if (report.User.WorkingChat != null)
+        {
+            chatsToNotify.Add(new ValueTuple<long, int?>(
+                report.User.WorkingChat.Id,
+                report.User.WorkingChat.MessageThreadId));
+        }
+
+        //
+        var userReport = report.EveningReport ?? report.MorningReport;
+
+        string message;
+
+        if (userReport.Approved)
+        {
+            if (reviewer != null)
+            {
+                message = string.Format(
+                    ReportHandSubmissionMessage,
+                    report.User.FullName,
+                    report.User.Position,
+                    reviewer.FullName,
+                    reviewer.Position,
+                    userReport.Data);
+            }
+            else
+            {
+                message = string.Format(
+                    ReportAnalyzerSubmissionMessage,
+                    report.User.FullName,
+                    report.User.Position,
+                    userReport.Data);
+            }
+        }
+        
+        //
+        else if (userReport.ApprovedBySystem)
+        {
+            message = string.Format(
+                ReportSystemSubmissionMessage,
+                report.User.FullName,
+                report.User.Position,
+                userReport.Data);
+        }
+
+        //
+        else throw new ArgumentException("Report is not approved");
+
+        //
+        var keyboard = AdminKeyboard.ExamReportKeyboard(report.Id, report.EveningReport != null);
+        
+        // Параллельно отправляем уведомления администраторам
+        await SendMessagesAsync(chatsToNotify, message, keyboard, token);
     }
 
     /// <summary>
     /// Отправляет сообщения пользователям параллельно.
     /// </summary>
-    /// <param name="userIds">Список ID пользователей.</param>
+    /// <param name="chats">Список ID пользователей.</param>
     /// <param name="message">Текст сообщения.</param>
     /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
     /// <returns>Задача, представляющая асинхронную операцию.</returns>
-    private async Task SendMessagesAsync(IEnumerable<long> userIds, string message, CancellationToken cancellationToken)
+    private Task SendMessagesAsync(
+        IEnumerable<long> chats,
+        string message,
+        ReplyMarkup? replyMarkup = null,
+        CancellationToken cancellationToken = default)
+    {
+        //
+        var chatsToSend = chats.Select(c => new ValueTuple<long, int?>(c, null));
+
+        //
+        return SendMessagesAsync(chatsToSend, message, replyMarkup, cancellationToken);
+    }
+
+    /// <summary>
+    /// Отправляет сообщения пользователям параллельно.
+    /// </summary>
+    /// <param name="chats">Список ID пользователей.</param>
+    /// <param name="message">Текст сообщения.</param>
+    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
+    /// <returns>Задача, представляющая асинхронную операцию.</returns>
+    private async Task SendMessagesAsync(
+        IEnumerable<(long chatId, int? threadId)> chats,
+        string message,
+        ReplyMarkup? replyMarkup = null,
+        CancellationToken cancellationToken = default)
     {
         // Устанавливаем токен отмены операции
         options.CancellationToken = cancellationToken;
 
         // Параллельная отправка сообщений каждому пользователю из списка.
-        await Parallel.ForEachAsync(userIds, options, async (userId, ct) =>
+        await Parallel.ForEachAsync(chats, options, async (chat, ct) =>
         {
             try
             {
                 // Отправка сообщения пользователю через Telegram API.
                 await client.SendMessage(
-                    chatId: userId, // ID пользователя, которому отправляется сообщение.
+                    chatId: chat.chatId, // ID пользователя, которому отправляется сообщение.
+                    messageThreadId: chat.threadId, // ID треда в чате
                     text: message, // Текст сообщения.
                     parseMode: ParseMode.Html, // Режим парсинга текста (HTML).
+                    replyMarkup: replyMarkup, // Клавиатура сообщения.
                     cancellationToken: ct // Токен отмены для текущей операции.
                 );
             }
             catch (ApiRequestException ex) // Обработка ошибок, связанных с запросами к Telegram API.
             {
                 // Логирование ошибки, если не удалось отправить сообщение.
-                logger.LogWarning(ex, "Failed to send message to user {UserId}.", userId);
+                logger.LogWarning(ex, "Failed to send message to chat {ChatId}.", chat.chatId);
             }
         });
     }

@@ -30,6 +30,7 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="options">Настройки параллелизма для рассылки сообщений.</param>
 /// <param name="analyzerConfiguration">Конфигурация анализатора отчётов.</param>
 /// <param name="synchronizationService">Сервис синхронизации пользователей.</param>
+/// <param name="motivationalMessageService">Сервис отправки мотивации на основании текста отчёта.</param>
 public class AnalyzeReportCommandHandler(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
@@ -38,6 +39,7 @@ public class AnalyzeReportCommandHandler(
     ParallelOptions options,
     ReportAnalysisConfiguration analyzerConfiguration,
     IUserSynchronizationService synchronizationService,
+    IMotivationalMessageService motivationalMessageService,
     ILogger<AnalyzeReportCommandHandler> logger)
     : IRequestHandler<AnalyzeReportCommand>
 {
@@ -140,16 +142,6 @@ public class AnalyzeReportCommandHandler(
         "📝 <i>Не забудьте указать ключевые результаты и планы на завтра.</i>";
 
     /// <summary>
-    /// Шаблон сообщения о прогрессе пользователя
-    /// </summary>
-    private const string RankProgressMessage =
-        "<b>🏆 Ваш прогресс:</b>\n\n" +
-        "{0}\n" +
-        "📊 <b>Текущий рейтинг:</b> {1:N2} очков\n" +
-        "🎯 <b>До следующего звания:</b> {2:N2} очков\n" +
-        "👥 <b>Пользователей позади вас:</b> {3}";
-
-    /// <summary>
     /// Обрабатывает команду анализа отчёта.
     /// </summary>
     /// <param name="request">Запрос, содержащий данные о команде анализа отчёта.</param>
@@ -235,7 +227,13 @@ public class AnalyzeReportCommandHandler(
         // Если анализатор включен, отправляем дополнительные сообщения:
         // - утренняя мотивация и рекомендации
         // - вечерняя оценка и похвала
-        await SendMotivationalMessagesAsync(request, report, ct);
+        await motivationalMessageService.SendMotivationalMessagesAsync(
+            request.ChatId,
+            request.MessageId,
+            report,
+            request.User,
+            ct
+        );
     }
 
     /// <summary>
@@ -623,227 +621,6 @@ public class AnalyzeReportCommandHandler(
                 );
             }
         }
-    }
-
-    /// <summary>
-    /// Отправляет мотивационные сообщения пользователю в зависимости от типа отчёта.
-    /// Определяет тип отчёта (утренний/вечерний) и вызывает соответствующие обработчики.
-    /// </summary>
-    /// <param name="request">Запрос с данными отчёта.</param>
-    /// <param name="report">Объект отчёта.</param>
-    /// <param name="ct">Токен отмены для асинхронных операций</param>
-    /// <returns>Task, представляющий асинхронную операцию отправки сообщений</returns>
-    private async Task SendMotivationalMessagesAsync(AnalyzeReportCommand request, Report report, CancellationToken ct)
-    {
-        // Проверяем включен ли модуль анализатора в конфигурации системы
-        if (!analyzerConfiguration.Enabled) return;
-
-        // Определяем тип отчёта по наличию вечернего отчёта
-        if (report.EveningReport == null)
-        {
-            try
-            {
-                // Отправка мотивационного сообщения
-                await SendMorningMotivationAsync(
-                    request,
-                    report.MorningReport.Data,
-                    ct);
-            }
-            catch
-            {
-                // ignored
-            }
-        }
-        else
-        {
-            try
-            {
-                // Отправка похвалы за проделанную работу
-                await SendEveningPraiseAsync(
-                    request,
-                    report.EveningReport.Data,
-                    ct);
-            }
-            catch
-            {
-                // ignored
-            }
-
-            try
-            {
-                // Обновление рейтинга пользователя
-                await ProcessUserScoreAsync(
-                    request,
-                    report.EveningReport.Data,
-                    ct);
-            }
-            catch
-            {
-                //ignored
-            }
-        }
-    }
-
-    /// <summary>
-    /// Отправляет утренние мотивационные сообщения пользователю
-    /// </summary>
-    /// <param name="request">Контекст запроса</param>
-    /// <param name="reportData">Текст утреннего отчета</param>
-    /// <param name="ct">Токен отмены</param>
-    private async Task SendMorningMotivationAsync(AnalyzeReportCommand request, string reportData,
-        CancellationToken ct)
-    {
-        // Генерируем мотивацию на основе утреннего отчета
-        var motivation = reportAnalyzer.GenerateMorningMotivationAsync(reportData, ct);
-        await SendTypingWhileWaitingAsync(request, motivation, ct);
-
-        // Отправляем три типа сообщений последовательно:
-        // 1. Основная мотивация
-        await client.SendMessage(
-            replyParameters: new ReplyParameters { MessageId = request.MessageId },
-            chatId: request.ChatId,
-            text: motivation.Result.Motivation,
-            cancellationToken: ct
-        );
-
-        // Отправляем индикатор "печатает" в чат пользователя.
-        await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
-        
-        // Создаем задачу задержки на 1 секунду с учетом токена отмены
-        await Task.Delay(TimeSpan.FromSeconds(2), ct);
-
-        // 2. Рекомендации на день
-        await client.SendMessage(
-            replyParameters: new ReplyParameters { MessageId = request.MessageId },
-            chatId: request.ChatId,
-            text: motivation.Result.Recommendations,
-            cancellationToken: ct
-        );
-        
-        // Отправляем индикатор "печатает" в чат пользователя.
-        await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
-        
-        // Создаем задачу задержки на 1 секунду с учетом токена отмены
-        await Task.Delay(TimeSpan.FromSeconds(2), ct);
-
-        // 3. Юмористическое завершение
-        await client.SendMessage(
-            chatId: request.ChatId,
-            text: motivation.Result.Humor,
-            cancellationToken: ct
-        );
-    }
-
-    /// <summary>
-    /// Отправляет вечерние похвалу и оценку пользователю
-    /// </summary>
-    /// <param name="request">Контекст запроса</param>
-    /// <param name="reportData">Текст утреннего отчета</param>
-    /// <param name="ct">Токен отмены</param>
-    private async Task SendEveningPraiseAsync(AnalyzeReportCommand request, string reportData,
-        CancellationToken ct)
-    {
-        // Генерируем похвалу на основе вечернего отчета
-        var praise = reportAnalyzer.GenerateEveningPraiseAsync(reportData, CancellationToken.None);
-        await SendTypingWhileWaitingAsync(request, praise, ct);
-
-        // Отправляем три типа сообщений:
-        // 1. Достижения за день
-        await client.SendMessage(
-            replyParameters: new ReplyParameters { MessageId = request.MessageId },
-            chatId: request.ChatId,
-            text: praise.Result.Achievements,
-            cancellationToken: ct
-        );
-        
-        // Отправляем индикатор "печатает" в чат пользователя.
-        await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
-        
-        // Создаем задачу задержки на 1 секунду с учетом токена отмены
-        await Task.Delay(TimeSpan.FromSeconds(2), ct);
-
-        // 2. Похвалу за проделанную работу
-        await client.SendMessage(
-            replyParameters: new ReplyParameters { MessageId = request.MessageId },
-            chatId: request.ChatId,
-            text: praise.Result.Praise,
-            cancellationToken: ct
-        );
-        
-        // Отправляем индикатор "печатает" в чат пользователя.
-        await client.SendChatAction(request.ChatId, ChatAction.Typing, cancellationToken: ct);
-        
-        // Создаем задачу задержки на 1 секунду с учетом токена отмены
-        await Task.Delay(TimeSpan.FromSeconds(2), ct);
-
-        // 3. Юмористическое завершение дня
-        await client.SendMessage(
-            chatId: request.ChatId,
-            text: praise.Result.Humor,
-            cancellationToken: ct
-        );
-    }
-
-    /// <summary>
-    /// Обрабатывает начисление очков пользователю за вечерний отчет:
-    /// 1. Получает оценку отчета
-    /// 2. Начисляет очки
-    /// 3. Проверяет изменение звания
-    /// 4. Формирует отчет о прогрессе
-    /// </summary>
-    /// <param name="request">Данные запроса, включая пользователя и контекст чата</param>
-    /// <param name="reportData">Текст вечернего отчета для анализа</param>
-    /// <param name="ct">Токен отмены для асинхронных операций</param>
-    private async Task ProcessUserScoreAsync(AnalyzeReportCommand request, string reportData, CancellationToken ct)
-    {
-        // Запускаем асинхронную задачу для получения оценки отчета
-        var scoreTask = reportAnalyzer.GetScorePointsAsync(reportData, ct);
-
-        // Пока задача выполняется, периодически отправляем индикатор "печатает"
-        await SendTypingWhileWaitingAsync(request, scoreTask, ct);
-
-        // Получаем результат выполнения задачи - количество заработанных очков
-        var earnedScore = scoreTask.Result;
-
-        // Сохраняем текущее звание ДО начисления очков для последующего сравнения
-        var previousRank = request.User!.Rank;
-
-        // Начисляем очки, если они положительные
-        if (earnedScore > 0) request.User.Score += earnedScore;
-
-        // Сохраняем изменения
-        await unitOfWork.SaveChangesAsync(ct);
-
-        // Получаем актуальное звание ПОСЛЕ начисления очков
-        var currentRank = request.User.Rank;
-
-        // Вычисляем сколько очков осталось до следующего звания
-        var pointsRemaining = request.User.PointsToNextRank;
-
-        // Запрос в БД для подсчета количества пользователей с меньшим рейтингом
-        var usersBehindCount = await unitOfWork.Query<User>()
-            .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
-            .Where(u => u.Score < request.User.Score)
-            .CountAsync(ct);
-
-        // Формируем основное сообщение в зависимости от изменения звания
-        var statusMessage = previousRank == currentRank
-            ? $"📈 <b>Вы</b> ({currentRank}) стали ближе к новому званию!"
-            : $"🎉 Поздравляем с повышением до <b>{currentRank}!</b>";
-
-        // Формируем итоговое сообщение, подставляя данные в шаблон
-        var message = string.Format(RankProgressMessage,
-            statusMessage,
-            request.User.Score,
-            pointsRemaining,
-            usersBehindCount);
-
-        // Отправляем сформированное сообщение пользователю
-        await client.SendMessage(
-            chatId: request.ChatId,
-            text: message,
-            parseMode: ParseMode.Html,
-            cancellationToken: ct);
     }
 
     /// <summary>

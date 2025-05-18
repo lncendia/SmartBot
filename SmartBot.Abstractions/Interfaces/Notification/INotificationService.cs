@@ -1,4 +1,7 @@
-﻿namespace SmartBot.Abstractions.Interfaces.Notification;
+﻿using SmartBot.Abstractions.Models.Reports;
+using SmartBot.Abstractions.Models.Users;
+
+namespace SmartBot.Abstractions.Interfaces.Notification;
 
 /// <summary>
 /// Интерфейс для уведомлений о событиях, связанных с отчётами.
@@ -52,4 +55,12 @@ public interface INotificationService
     /// Этот метод вызывается, если вечерний отчёт не был сдан в установленный срок.
     /// </remarks>
     Task NotifyEveningReportMissedAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Отправляет уведомления о сохранении отчёта пользователю и администраторам.
+    /// </summary>
+    /// <param name="request">Запрос с данными отчёта.</param>
+    /// <param name="report">Объект отчёта.</param>
+    /// <param name="reportText">Текст отчёта.</param>
+    Task NotifyNewRepostAsync(Report report, User? reviewer, CancellationToken token = default);
 }

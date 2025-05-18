@@ -15,4 +15,14 @@ public class UserReport
     /// Если отчёт сдан вовремя, значение равно null.
     /// </summary>
     public TimeSpan? Overdue { get; init; }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public bool Approved { get; set; }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public bool ApprovedBySystem { get; set; }
 }
