@@ -89,16 +89,30 @@ public class GoogleSheetsExporter : IDataExporter
             report.Position ?? string.Empty,
 
             // Утренний отчёт
-            report.MorningReport ?? string.Empty,
+            report.MorningReport?.Data ?? string.Empty,
 
             // Просрочка утреннего отчёта
-            report.MorningReportOverdue.FormatTimeSpan(),
+            report.MorningReport?.Overdue.FormatTimeSpan() ?? string.Empty,
+
+            //
+            report.MorningReport == null
+                ? string.Empty 
+                : report.MorningReport.Approved 
+                    ? "Администратором" 
+                    : "Автоматически",
 
             // Вечерний отчёт
-            report.EveningReport ?? string.Empty,
+            report.EveningReport?.Data ?? string.Empty,
 
             // Просрочка утреннего отчёта
-            report.EveningReportOverdue.FormatTimeSpan(),
+            report.EveningReport?.Overdue.FormatTimeSpan() ?? string.Empty,
+
+            //
+            report.EveningReport == null
+                ? string.Empty 
+                : report.EveningReport.Approved 
+                    ? "Администратором" 
+                    : "Автоматически",
 
             // Дата отчёта
             report.Date.ToString("dd.MM.yyyy"),
@@ -112,7 +126,15 @@ public class GoogleSheetsExporter : IDataExporter
         {
             values.Insert(0, new List<object>
             {
-                "Имя", "Должность", "Утренний отчёт", "Просрочен на", "Вечерний отчёт", "Просрочен на", "Дата",
+                "Имя",
+                "Должность",
+                "Утренний отчёт",
+                "Просрочен на",
+                "Проверен",
+                "Вечерний отчёт",
+                "Просрочен на",
+                "Проверен",
+                "Дата",
                 "Комментарий"
             });
         }
@@ -232,7 +254,7 @@ public class GoogleSheetsExporter : IDataExporter
                         Fields = "pixelSize"
                     }
                 },
-                // Запрос для установки ширины колонки 3 (Morning Report Overdue) в 150 пикселей
+                // Запрос для установки ширины колонки 3 и 4 (Morning Report Overdue и Approved) в 150 пикселей
                 new()
                 {
                     UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
@@ -242,7 +264,7 @@ public class GoogleSheetsExporter : IDataExporter
                             SheetId = _configuration.SheetId,
                             Dimension = "COLUMNS",
                             StartIndex = 3,
-                            EndIndex = 4
+                            EndIndex = 5
                         },
                         Properties = new DimensionProperties
                         {
@@ -251,26 +273,7 @@ public class GoogleSheetsExporter : IDataExporter
                         Fields = "pixelSize"
                     }
                 },
-                // Запрос для установки ширины колонок 4 (Evening Report) в 400 пикселей
-                new()
-                {
-                    UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
-                    {
-                        Range = new DimensionRange
-                        {
-                            SheetId = _configuration.SheetId,
-                            Dimension = "COLUMNS",
-                            StartIndex = 4,
-                            EndIndex = 5
-                        },
-                        Properties = new DimensionProperties
-                        {
-                            PixelSize = 400
-                        },
-                        Fields = "pixelSize"
-                    }
-                },
-                // Запрос для установки ширины колонки 5 (Evening Report Overdue) в 150 пикселей
+                // Запрос для установки ширины колонок 5 (Evening Report) в 400 пикселей
                 new()
                 {
                     UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
@@ -284,13 +287,12 @@ public class GoogleSheetsExporter : IDataExporter
                         },
                         Properties = new DimensionProperties
                         {
-                            PixelSize = 150
+                            PixelSize = 400
                         },
                         Fields = "pixelSize"
                     }
                 },
-
-                // Запрос для установки ширины колонки 6 (Date) в 150 пикселей
+                // Запрос для установки ширины колонки 6 и 7 (Evening Report Overdue и Approved) в 150 пикселей
                 new()
                 {
                     UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
@@ -300,7 +302,7 @@ public class GoogleSheetsExporter : IDataExporter
                             SheetId = _configuration.SheetId,
                             Dimension = "COLUMNS",
                             StartIndex = 6,
-                            EndIndex = 7
+                            EndIndex = 8
                         },
                         Properties = new DimensionProperties
                         {
@@ -310,7 +312,7 @@ public class GoogleSheetsExporter : IDataExporter
                     }
                 },
 
-                // Запрос для установки ширины колонки 7 (Comment) в 300 пикселей
+                // Запрос для установки ширины колонки 8 (Date) в 150 пикселей
                 new()
                 {
                     UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
@@ -319,8 +321,28 @@ public class GoogleSheetsExporter : IDataExporter
                         {
                             SheetId = _configuration.SheetId,
                             Dimension = "COLUMNS",
-                            StartIndex = 7,
-                            EndIndex = 8
+                            StartIndex = 8,
+                            EndIndex = 9
+                        },
+                        Properties = new DimensionProperties
+                        {
+                            PixelSize = 150
+                        },
+                        Fields = "pixelSize"
+                    }
+                },
+
+                // Запрос для установки ширины колонки 9 (Comment) в 300 пикселей
+                new()
+                {
+                    UpdateDimensionProperties = new UpdateDimensionPropertiesRequest
+                    {
+                        Range = new DimensionRange
+                        {
+                            SheetId = _configuration.SheetId,
+                            Dimension = "COLUMNS",
+                            StartIndex = 9,
+                            EndIndex = 10
                         },
                         Properties = new DimensionProperties
                         {
@@ -347,7 +369,7 @@ public class GoogleSheetsExporter : IDataExporter
                         StartRowIndex = 0,
                         EndRowIndex = 1,
                         StartColumnIndex = 0,
-                        EndColumnIndex = 8
+                        EndColumnIndex = 10
                     },
 
                     // Устанавливаем параметры форматирования
@@ -401,7 +423,7 @@ public class GoogleSheetsExporter : IDataExporter
                     StartRowIndex = lastRow,
                     EndRowIndex = lastRow + reportsCount,
                     StartColumnIndex = 0,
-                    EndColumnIndex = 8
+                    EndColumnIndex = 10
                 },
 
                 // Устанавливаем параметры форматирования
@@ -482,23 +504,23 @@ public class GoogleSheetsExporter : IDataExporter
         // Добавляем запрос форматирования данных в список запросов.
         requests.Add(wrapTextRequestColumn2);
 
-        // Создаем запрос для установки переноса текста в колонке с индексом 4.
-        var wrapTextRequestColumn4 = new Request
+        // Создаем запрос для установки переноса текста в колонке с индексом 5.
+        var wrapTextRequestColumn5 = new Request
         {
             // Указываем параметры для обновления ячеек.
             RepeatCell = new RepeatCellRequest
             {
-                // Указываем диапазон колонок (4).
+                // Указываем диапазон колонок (5).
                 Range = new GridRange
                 {
                     // ID листа, на котором будут применяться изменения.
                     SheetId = _configuration.SheetId,
 
-                    // Начальная колонка (индекс 4).
-                    StartColumnIndex = 4,
+                    // Начальная колонка (индекс 5).
+                    StartColumnIndex = 5,
 
-                    // Конечная колонка (индекс 5, не включая).
-                    EndColumnIndex = 5,
+                    // Конечная колонка (индекс 6, не включая).
+                    EndColumnIndex = 6,
 
                     // Начальная строка (индекс 1, пропускаем заголовок).
                     StartRowIndex = 1,
@@ -524,25 +546,25 @@ public class GoogleSheetsExporter : IDataExporter
         };
 
         // Добавляем запрос форматирования данных в список запросов.
-        requests.Add(wrapTextRequestColumn4);
+        requests.Add(wrapTextRequestColumn5);
 
-        // Создаем запрос для установки переноса текста в колонке с индексом 7.
-        var wrapTextRequestColumn7 = new Request
+        // Создаем запрос для установки переноса текста в колонке с индексом 9.
+        var wrapTextRequestColumn9 = new Request
         {
             // Указываем параметры для обновления ячеек.
             RepeatCell = new RepeatCellRequest
             {
-                // Указываем диапазон колонок (7).
+                // Указываем диапазон колонок (9).
                 Range = new GridRange
                 {
                     // ID листа, на котором будут применяться изменения.
                     SheetId = _configuration.SheetId,
 
-                    // Начальная колонка (индекс 7).
-                    StartColumnIndex = 7,
+                    // Начальная колонка (индекс 9).
+                    StartColumnIndex = 9,
 
-                    // Конечная колонка (индекс 8, не включая).
-                    EndColumnIndex = 8,
+                    // Конечная колонка (индекс 10, не включая).
+                    EndColumnIndex = 10,
 
                     // Начальная строка (индекс 1, пропускаем заголовок).
                     StartRowIndex = 1,
@@ -568,7 +590,7 @@ public class GoogleSheetsExporter : IDataExporter
         };
 
         // Добавляем запрос форматирования данных в список запросов.
-        requests.Add(wrapTextRequestColumn7);
+        requests.Add(wrapTextRequestColumn9);
 
         // Создаем запрос для установки высоты строк данных.
         var dataRowHeightRequest = new Request

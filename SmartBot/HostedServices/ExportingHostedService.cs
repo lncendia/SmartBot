@@ -130,7 +130,7 @@ public class ExportingHostedService(
 
                 // Фильтруем пользователей, не являющихся администратороми
                 .Where(u => u.Role == Role.Employee || u.Role == Role.TeleAdmin)
-                
+
                 // Фильтруем пользователей которые заполнили свои данные`
                 .Where(u => u.Position != null)
 
@@ -167,20 +167,34 @@ public class ExportingHostedService(
                         Date = report != null ? report.Date.Date : dateTimeProvider.Now.Date.AddDays(-1),
 
                         // Утренний отчёт
-                        MorningReport = report != null ? report.MorningReport.Data : null,
+                        MorningReport = report == null
+                            ? null
+                            : new ReportElement
+                            {
+                                //
+                                Data = report.MorningReport.Data,
 
-                        // Просрочка утреннего отчёта
-                        MorningReportOverdue = report != null ? report.MorningReport.Overdue : null,
+                                //
+                                Overdue = report.MorningReport.Overdue,
+
+                                //
+                                Approved = report.MorningReport.Approved
+                            },
 
                         // Вечерний отчёт
-                        EveningReport = report != null && report.EveningReport != null
-                            ? report.EveningReport.Data
-                            : null,
+                        EveningReport = report == null || report.EveningReport == null
+                            ? null
+                            : new ReportElement
+                            {
+                                //
+                                Data = report.EveningReport.Data,
 
-                        // Просрочка вечернего отчёта
-                        EveningReportOverdue = report != null && report.EveningReport != null
-                            ? report.EveningReport.Overdue
-                            : null,
+                                //
+                                Overdue = report.EveningReport.Overdue,
+
+                                //
+                                Approved = report.EveningReport.Approved
+                            },
 
                         // Комментарий к отчёту
                         Comment = report != null ? report.Comment : null,

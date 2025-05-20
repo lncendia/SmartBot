@@ -11,17 +11,17 @@ public class Report
     /// Уникальный идентификатор отчета.
     /// </summary>
     public Guid Id { get; init; } = Guid.NewGuid();
-    
+
     /// <summary>
     /// Идентификатор пользователя, связанного с отчетом.
     /// </summary>
     public required long UserId { get; init; }
-    
+
     /// <summary>
     /// Навигационное свойство
     /// </summary>
     public User? User { get; init; }
-    
+
     /// <summary>
     /// Утренний отчет.
     /// </summary>
@@ -41,4 +41,11 @@ public class Report
     /// Комментарий, сгенерированный ботом.
     /// </summary>
     public string? Comment { get; set; }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="evening"></param>
+    /// <returns></returns>
+    public UserReport? GetReport(bool evening) => evening ? EveningReport : MorningReport;
 }

@@ -112,5 +112,8 @@ public static class ReportsServices
         
         // Регистрируем фоновый сервис для очистки старых отчетов
         services.AddHostedService<ClearingHostedService>();
+        
+        // Регистрируем фоновый сервис для автоматического принятия отчётов по истечении времени ожидания
+        services.AddHostedService<ReportApprovalHostedService>();
     }
 }

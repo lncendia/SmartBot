@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Infrastructure.Configurations;
 
 namespace SmartBot.Infrastructure.Contexts;
@@ -26,6 +27,19 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         
         // Применяем конфигурацию для сущности WorkingChat
         modelBuilder.ApplyConfiguration(new WorkingChatConfiguration());
+        
+        // Применяем конфигурацию для сущности UserReport
+        modelBuilder.ApplyConfiguration(new UserReportConfiguration());
+        
+        // Автозагрузка связанных отчётов
+        modelBuilder.Entity<Report>()
+            .Navigation(r => r.MorningReport)
+            .AutoInclude();
+    
+        // Автозагрузка связанных отчётов
+        modelBuilder.Entity<Report>()
+            .Navigation(r => r.EveningReport)
+            .AutoInclude();
         
         // Вызываем базовую реализацию метода
         base.OnModelCreating(modelBuilder);

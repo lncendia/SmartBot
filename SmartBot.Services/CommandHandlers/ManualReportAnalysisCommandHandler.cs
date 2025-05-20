@@ -1,19 +1,15 @@
 ﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
-using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
+using SmartBot.Abstractions.Interfaces.Notification;
 using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Services.Extensions;
-using SmartBot.Services.Keyboards;
 using Telegram.Bot;
-using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using User = SmartBot.Abstractions.Models.Users.User;
 
 namespace SmartBot.Services.CommandHandlers;
 
@@ -23,19 +19,17 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
 /// <param name="dateTimeProvider">Провайдер для работы с текущим временем.</param>
-/// <param name="logger">Логгер.</param>
-/// <param name="options">Настройки параллелизма для рассылки сообщений.</param>
 /// <param name="synchronizationService">Сервис синхронизации пользователей.</param>
+/// <param name="notificationService">Сервис рассылки уведомлений.</param>
 /// <param name="motivationalMessageService">Сервис отправки мотивации на основании текста отчёта.</param>
-public class SendReportWithoutAnalysisCommandHandler(
+public class ManualReportAnalysisCommandHandler(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
     IDateTimeProvider dateTimeProvider,
-    ParallelOptions options,
     IUserSynchronizationService synchronizationService,
-    IMotivationalMessageService motivationalMessageService,
-    ILogger<SendReportWithoutAnalysisCommandHandler> logger)
-    : IRequestHandler<SendReportWithoutAnalysisCommand>
+    INotificationService notificationService,
+    IMotivationalMessageService motivationalMessageService)
+    : IRequestHandler<ManualReportAnalysisCommand>
 {
     /// <summary>
     /// Сообщение, которое отправляется пользователю после успешного анализа и сохранения утреннего отчёта.
@@ -44,7 +38,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     private const string MorningSuccessMessage =
         "<b>Отличный утренний отчёт! ✅</b>\n\n" +
         "Теперь вы готовы к продуктивному дню! Не забывайте следить за своими целями и задачами. " +
-        "Вечерний отчёт можно будет отправить после 18:00, чтобы подвести итоги дня.";
+        "Вечерний отчёт можно будет отправить после 17:00, чтобы подвести итоги дня.";
 
     /// <summary>
     /// Сообщение, которое отправляется пользователю после успешного анализа и сохранения вечернего отчёта.
@@ -102,7 +96,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     /// </summary>
     /// <param name="request">Запрос, содержащий данные о команде анализа отчёта.</param>
     /// <param name="ct">Токен отмены операции.</param>
-    public async Task Handle(SendReportWithoutAnalysisCommand request, CancellationToken ct)
+    public async Task Handle(ManualReportAnalysisCommand request, CancellationToken ct)
     {
         // Синхронизируем пользователя
         await synchronizationService.SynchronizeAsync(request.TelegramUserId, ct);
@@ -129,7 +123,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     /// </summary>
     /// <param name="request">Запрос, содержащий данные отчёта и контекст выполнения</param>
     /// <param name="ct">Токен для отмены асинхронной операции</param>
-    private async Task ProcessCommandAsync(SendReportWithoutAnalysisCommand request, CancellationToken ct)
+    private async Task ProcessCommandAsync(ManualReportAnalysisCommand request, CancellationToken ct)
     {
         // Первичная валидация содержимого отчёта:
         // - проверка на null/пустую строку
@@ -166,14 +160,14 @@ public class SendReportWithoutAnalysisCommandHandler(
         // - разный текст для утреннего/вечернего отчёта
         // - уведомление о просрочке при необходимости
         await SendSuccessMessageToUserAsync(request, report);
-        
+
         // Если отчёт просрочен, то отправляем его в чаты и отправляем мотивацию и похвалу
         if (report.EveningReport?.Overdue.HasValue ?? report.MorningReport.Overdue.HasValue)
         {
             // Уведомляем администраторов о новом отчёте:
             // - всем администраторам системы
             // - в рабочий чат пользователя (если указан)
-            await NotifyAdminsAsync(request, report, reportText);
+            await notificationService.NotifyNewReportAsync(report, token: ct);
 
             // Если анализатор включен, отправляем дополнительные сообщения:
             // - утренняя мотивация и рекомендации
@@ -186,10 +180,12 @@ public class SendReportWithoutAnalysisCommandHandler(
                 ct
             );
         }
-
-        // иначе отправляем уведомление админам о проверке {
-        //
-        // }
+        // Иначе уведомляем администраторов о необходимости проверить отчёт
+        else
+        {
+            // Отправляем уведомление о необходимости проверить отчёт
+            await notificationService.NotifyVerifyReportAsync(report, ct);
+        }
     }
 
     /// <summary>
@@ -204,7 +200,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     /// Возвращает true, если отчёт прошёл все проверки,
     /// false - если обнаружены нарушения валидации
     /// </returns>
-    private async Task<bool> ValidateReportAsync(SendReportWithoutAnalysisCommand request, CancellationToken ct)
+    private async Task<bool> ValidateReportAsync(ManualReportAnalysisCommand request, CancellationToken ct)
     {
         // Если у пользователя есть текущий введенный отчёт
         if (!string.IsNullOrWhiteSpace(request.User!.CurrentReport)) return true;
@@ -231,7 +227,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     /// Возвращает true, если текущее время подходит для отправки отчётов,
     /// false - если отправка запрещена по временным ограничениям
     /// </returns>
-    private async Task<bool> CheckTimeRestrictionsAsync(SendReportWithoutAnalysisCommand request, DateTime now,
+    private async Task<bool> CheckTimeRestrictionsAsync(ManualReportAnalysisCommand request, DateTime now,
         CancellationToken ct)
     {
         // Проверяем находится ли текущее время в разрешённом периоде
@@ -256,7 +252,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     /// <param name="now">Текущее время.</param>
     /// <param name="ct">Токен отмены операции.</param>
     /// <returns>Объект отчёта или null, если дальнейшая обработка не требуется.</returns>
-    private async Task<Report?> GetReportAsync(SendReportWithoutAnalysisCommand request, DateTime now,
+    private async Task<Report?> GetReportAsync(ManualReportAnalysisCommand request, DateTime now,
         CancellationToken ct)
     {
         // Запрашиваем отчёт из базы данных по ID пользователя и дате
@@ -285,7 +281,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     /// - вечерний отчёт уже существует
     /// - утренний отчёт уже существует и не наступило время вечернего
     /// </returns>
-    private async Task<bool> CheckReportAbilityAsync(SendReportWithoutAnalysisCommand request, Report? report,
+    private async Task<bool> CheckReportAbilityAsync(ManualReportAnalysisCommand request, Report? report,
         DateTime now,
         CancellationToken ct)
     {
@@ -333,7 +329,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     /// <param name="reportText">Текст отчёта.</param>
     /// <param name="ct">Токен для отмены асинхронных операций</param>
     /// <returns>Обновленный или созданный объект отчета</returns>
-    private async Task<Report> UpdateAndSaveReportAsync(SendReportWithoutAnalysisCommand request, Report? report,
+    private async Task<Report> UpdateAndSaveReportAsync(ManualReportAnalysisCommand request, Report? report,
         DateTime now,
         string reportText,
         CancellationToken ct)
@@ -343,7 +339,7 @@ public class SendReportWithoutAnalysisCommandHandler(
         {
             // Проверяем просрочку отправки утреннего отчета
             var overdue = now.MorningReportOverdue();
-            
+
             // Инициализируем новый объект отчета
             report = new Report
             {
@@ -361,9 +357,12 @@ public class SendReportWithoutAnalysisCommandHandler(
 
                     // Устанавливаем просрочку отправки утреннего отчета
                     Overdue = overdue,
-                    
+
                     // Автоматически считаем принятыми просроченные отчёты
-                    ApprovedBySystem = overdue.HasValue
+                    ApprovedBySystem = overdue.HasValue,
+                    
+                    // Устанавливаем дату сдачи отчёта
+                    Date = now
                 }
             };
 
@@ -375,7 +374,7 @@ public class SendReportWithoutAnalysisCommandHandler(
         {
             // Проверяем просрочку отправки вечернего отчета
             var overdue = now.MorningReportOverdue();
-            
+
             // Добавляем или обновляем вечерний отчет
             report.EveningReport = new UserReport
             {
@@ -384,9 +383,12 @@ public class SendReportWithoutAnalysisCommandHandler(
 
                 // Устанавливаем просрочку отправки вечернего отчета
                 Overdue = overdue,
-                
+
                 // Автоматически считаем принятыми просроченные отчёты
-                ApprovedBySystem = overdue.HasValue
+                ApprovedBySystem = overdue.HasValue,
+                
+                // Устанавливаем дату сдачи отчёта
+                Date = now
             };
         }
 
@@ -405,7 +407,7 @@ public class SendReportWithoutAnalysisCommandHandler(
     /// </summary>
     /// <param name="request">Запрос с данными отчёта.</param>
     /// <param name="report">Объект отчёта.</param>
-    private async Task SendSuccessMessageToUserAsync(SendReportWithoutAnalysisCommand request, Report report)
+    private async Task SendSuccessMessageToUserAsync(ManualReportAnalysisCommand request, Report report)
     {
         if (report.EveningReport == null)
         {

@@ -31,6 +31,11 @@ public enum State
     AwaitingCommentInput,
     
     /// <summary>
+    /// Ожидает ввода комментария от пользователя при отклонении отчёта.
+    /// </summary>
+    AwaitingRejectCommentInput,
+    
+    /// <summary>
     /// Ожидает ввода ответа на сообщение от пользователя.
     /// </summary>
     AwaitingAnswerInput,

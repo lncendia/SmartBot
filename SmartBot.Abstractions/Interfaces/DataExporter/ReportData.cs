@@ -23,25 +23,13 @@ public class ReportData
     /// <summary>
     /// Утренний отчет.
     /// </summary>
-    public string? MorningReport { get; init; }
+    public ReportElement? MorningReport { get; init; }
     
-    /// <summary>
-    /// Время, на которое утренний отчёт был просрочен.
-    /// Если отчёт сдан вовремя, значение равно null.
-    /// </summary>
-    public TimeSpan? MorningReportOverdue { get; init; }
-
     /// <summary>
     /// Вечерний отчет.
     /// </summary>
-    public string? EveningReport { get; init; }
+    public ReportElement? EveningReport { get; init; }
     
-    /// <summary>
-    /// Время, на которое вечерний отчёт был просрочен.
-    /// Если отчёт сдан вовремя, значение равно null.
-    /// </summary>
-    public TimeSpan? EveningReportOverdue { get; init; }
-
     /// <summary>
     /// Дата создания отчета.
     /// </summary>
@@ -51,4 +39,30 @@ public class ReportData
     /// Комментарий, сгенерированный ботом.
     /// </summary>
     public string? Comment { get; init; }
+}
+
+/// <summary>
+/// Класс, представляющий отчёт пользователя (утренний или вечерний).
+/// </summary>
+public class ReportElement
+{
+    /// <summary>
+    /// Данные отчёта (например, текст или структурированные данные).
+    /// </summary>
+    public required string Data { get; init; }
+
+    /// <summary>
+    /// Время, на которое отчёт был просрочен (если отчёт сдан с опозданием).
+    /// Если отчёт сдан вовремя, значение равно null.
+    /// </summary>
+    public TimeSpan? Overdue { get; init; }
+
+    /// <summary>
+    /// Флаг, указывающий был ли отчёт одобрен администратором.
+    /// </summary>
+    /// <value>
+    /// true - отчёт проверен и одобрен администратором,
+    /// false - отчёт не проверен или отклонён.
+    /// </value>
+    public bool Approved { get; set; }
 }

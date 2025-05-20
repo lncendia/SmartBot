@@ -135,6 +135,19 @@ public class MessageCommandFactory : IMessageCommandFactory
             };
         }
 
+        // Если бот ожидает ввода причины отклонения отчёта
+        if (user.State == State.AwaitingRejectCommentInput)
+        {
+            // Возвращаем команду для добавления комментария
+            return new RejectReportCommand
+            {
+                ChatId = message.Chat,
+                TelegramUserId = message.From!.Id,
+                User = user,
+                Comment = message.Text
+            };
+        }
+        
         // Если бот ожидает ввода ID нового администратора
         if (user.State is State.AwaitingAdminIdForAdding or State.AwaitingTeleAdminIdForAdding &&
             message.Type == MessageType.UsersShared)

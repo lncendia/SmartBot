@@ -4,10 +4,10 @@ using SmartBot.Abstractions.Commands.Abstractions;
 namespace SmartBot.Abstractions.Commands;
 
 /// <summary>
-/// Команда для отправки отчёта без проверки анализатором.
+/// Команда для отправки отчёта на ручную проверку.
 /// </summary>
 [AsyncCommand]
-public class SendReportWithoutAnalysisCommand : CallbackQueryCommand
+public class ManualReportAnalysisCommand : CallbackQueryCommand
 {
     /// <summary>
     /// Идентификатор сообщения с отчётом.

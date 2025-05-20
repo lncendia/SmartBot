@@ -104,8 +104,6 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о необходимости сдать утренний отчёт.
     /// </summary>
-    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
-    /// <returns>Задача, представляющая асинхронную операцию.</returns>
     public async Task NotifyMorningReportDueAsync(CancellationToken cancellationToken = default)
     {
         // Получаем текущее время.
@@ -137,8 +135,6 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о том, что время сдачи утреннего отчёта подходит к концу.
     /// </summary>
-    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
-    /// <returns>Задача, представляющая асинхронную операцию.</returns>
     public async Task NotifyMorningReportDeadlineApproachingAsync(CancellationToken cancellationToken = default)
     {
         // Получаем текущее время.
@@ -170,8 +166,6 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о том, что утренний отчёт не был сдан.
     /// </summary>
-    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
-    /// <returns>Задача, представляющая асинхронную операцию.</returns>
     public async Task NotifyMorningReportMissedAsync(CancellationToken cancellationToken = default)
     {
         // Получаем текущее время.
@@ -203,8 +197,6 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о необходимости сдать вечерний отчёт.
     /// </summary>
-    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
-    /// <returns>Задача, представляющая асинхронную операцию.</returns>
     public async Task NotifyEveningReportDueAsync(CancellationToken cancellationToken = default)
     {
         // Получаем текущее время для проверки отчётов за сегодняшний день.
@@ -259,8 +251,6 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о том, что время сдачи вечернего отчёта подходит к концу.
     /// </summary>
-    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
-    /// <returns>Задача, представляющая асинхронную операцию.</returns>
     public async Task NotifyEveningReportDeadlineApproachingAsync(CancellationToken cancellationToken = default)
     {
         // Получаем текущее время для проверки отчётов за сегодняшний день.
@@ -315,8 +305,6 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о том, что вечерний отчёт не был сдан.
     /// </summary>
-    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
-    /// <returns>Задача, представляющая асинхронную операцию.</returns>
     public async Task NotifyEveningReportMissedAsync(CancellationToken cancellationToken = default)
     {
         // Получаем текущее время для проверки отчётов за сегодняшний день.
@@ -404,31 +392,41 @@ public class NotificationService(
         "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
 
     /// <summary>
-    /// Отправляет уведомления о сохранении отчёта пользователю и администраторам.
+    /// Сообщение для администратора о новом отчёте, требующем проверки.
+    /// Содержит имя пользователя, должность и текст отчёта.
     /// </summary>
-    /// <param name="request">Запрос с данными отчёта.</param>
-    /// <param name="report">Объект отчёта.</param>
-    /// <param name="reportText">Текст отчёта.</param>
-    public async Task NotifyNewRepostAsync(Report report, User? reviewer, CancellationToken token = default)
-    {
-        // Если навигационное свойство не указано
-        if (report.User == null) throw new ArgumentException("Please set the User navigation property in the Report");
+    private const string ReportVerificationRequestMessage =
+        "📢 <b>Требуется проверка отчёта</b> от <i>{0}</i>\n" +
+        "🧑‍💼 <b>Должность:</b> <i>{1}</i>\n\n" +
+        "🔍 <b>Отчёт ожидает вашего решения</b>\n\n" +
+        "👇 <b>Текст отчёта:</b>\n" +
+        "<blockquote>{2}</blockquote>\n\n" +
+        "📌 <i>Используйте кнопки ниже для подтверждения или отклонения отчёта</i>";
 
-        // Получаем список администраторов
+    /// <inheritdoc/>
+    /// <summary>
+    /// Уведомляет о создании нового отчёта.
+    /// </summary>
+    public async Task NotifyNewReportAsync(Report report, User? reviewer = null, CancellationToken token = default)
+    {
+        // Проверяем, что отчёт привязан к пользователю
+        if (report.User == null)
+            throw new ArgumentException("Please set the User navigation property in the Report");
+
+        // Получаем список ID всех администраторов системы
         var admins = await unitOfWork
             .Query<User>()
             .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
             .Select(u => u.Id)
-            .ToListAsync(CancellationToken.None);
+            .ToListAsync(token);
 
-        // Формируем список чатов для уведомлений
+        // Формируем список чатов для уведомлений, исключая автора отчёта
         var chatsToNotify = admins
-            .Where(a => a != report.User!.Id)
-            .Where(a => a != reviewer?.Id)
-            .Select(a => new ValueTuple<long, int?>(a, null))
+            .Where(a => a != report.User!.Id) // Исключаем автора отчёта из получателей
+            .Select(a => new ValueTuple<long, int?>(a, null)) // Создаём кортежи (chatId, threadId)
             .ToList();
 
-        // Добавляем рабочий чат пользователя, если он есть
+        // Если у пользователя есть рабочий чат, добавляем его в список получателей
         if (report.User.WorkingChat != null)
         {
             chatsToNotify.Add(new ValueTuple<long, int?>(
@@ -436,70 +434,122 @@ public class NotificationService(
                 report.User.WorkingChat.MessageThreadId));
         }
 
-        //
+        // Определяем тип отчёта (утренний/вечерний)
         var userReport = report.EveningReport ?? report.MorningReport;
 
         string message;
 
+        // Формируем сообщение в зависимости от статуса и способа подтверждения отчёта
         if (userReport.Approved)
         {
+            // Если отчёт подтверждён вручную администратором
             if (reviewer != null)
             {
                 message = string.Format(
-                    ReportHandSubmissionMessage,
-                    report.User.FullName,
-                    report.User.Position,
-                    reviewer.FullName,
-                    reviewer.Position,
-                    userReport.Data);
+                    ReportHandSubmissionMessage, // Шаблон для ручного подтверждения
+                    report.User.FullName, // 0: Имя пользователя
+                    report.User.Position, // 1: Должность
+                    reviewer.FullName, // 2: Имя подтверждающего
+                    reviewer.Position, // 3: Должность подтверждающего
+                    userReport.Data); // 4: Текст отчёта
             }
             else
             {
+                // Если отчёт подтверждён автоматически анализатором
                 message = string.Format(
-                    ReportAnalyzerSubmissionMessage,
-                    report.User.FullName,
-                    report.User.Position,
-                    userReport.Data);
+                    ReportAnalyzerSubmissionMessage, // Шаблон для автоматического подтверждения
+                    report.User.FullName, // 0: Имя пользователя
+                    report.User.Position, // 1: Должность
+                    userReport.Data); // 2: Текст отчёта
             }
         }
-        
-        //
         else if (userReport.ApprovedBySystem)
         {
+            // Если отчёт подтверждён системой (без анализатора)
             message = string.Format(
-                ReportSystemSubmissionMessage,
-                report.User.FullName,
-                report.User.Position,
-                userReport.Data);
+                ReportSystemSubmissionMessage, // Шаблон для системного подтверждения
+                report.User.FullName, // 0: Имя пользователя
+                report.User.Position, // 1: Должность
+                userReport.Data); // 2: Текст отчёта
+        }
+        else
+        {
+            // Если отчёт не подтверждён ни одним из способов
+            throw new ArgumentException("Report is not approved");
         }
 
-        //
-        else throw new ArgumentException("Report is not approved");
+        // Создаём клавиатуру с кнопкой для комментариев
+        var keyboard = AdminKeyboard.CommentReportKeyboard(
+            report.Id,
+            report.EveningReport != null); // Флаг типа отчёта
 
-        //
-        var keyboard = AdminKeyboard.ExamReportKeyboard(report.Id, report.EveningReport != null);
+        // Отправляем уведомления всем получателям
+        await SendMessagesAsync(chatsToNotify, message, keyboard, token);
+    }
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// Уведомляет о необходимости анализа и проверки отчёта.
+    /// </summary>
+    public async Task NotifyVerifyReportAsync(Report report, CancellationToken token = default)
+    {
+        // Проверяем, что отчёт привязан к пользователю
+        if (report.User == null)
+            throw new ArgumentException("Please set the User navigation property in the Report");
+
+        // Получаем список ID всех администраторов системы
+        var admins = await unitOfWork
+            .Query<User>()
+            .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
+            .Select(u => u.Id)
+            .ToListAsync(token);
         
-        // Параллельно отправляем уведомления администраторам
+        // Формируем список чатов для уведомлений, исключая автора отчёта
+        var chatsToNotify = admins
+            .Where(a => a != report.User!.Id) // Исключаем автора отчёта из получателей
+            .ToList();
+
+        // Определяем тип отчёта (утренний/вечерний)
+        var userReport = report.EveningReport ?? report.MorningReport;
+
+        // Формируем сообщение с запросом проверки
+        var message = string.Format(
+            ReportVerificationRequestMessage, // Шаблон запроса проверки
+            report.User.FullName, // 0: Имя пользователя
+            report.User.Position, // 1: Должность
+            userReport.Data); // 2: Текст отчёта
+
+        // Создаём клавиатуру с кнопками подтверждения/отклонения
+        var keyboard = AdminKeyboard.VerifyReportKeyboard(
+            report.Id,
+            report.EveningReport != null); // Флаг типа отчёта
+
+        // Отправляем уведомления всем администраторам
         await SendMessagesAsync(chatsToNotify, message, keyboard, token);
     }
 
     /// <summary>
     /// Отправляет сообщения пользователям параллельно.
     /// </summary>
-    /// <param name="chats">Список ID пользователей.</param>
-    /// <param name="message">Текст сообщения.</param>
-    /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
-    /// <returns>Задача, представляющая асинхронную операцию.</returns>
+    /// <param name="chats">Список ID пользователей для отправки сообщений</param>
+    /// <param name="message">Текст сообщения для отправки</param>
+    /// <param name="replyMarkup">Опциональная клавиатура или разметка для сообщения</param>
+    /// <param name="cancellationToken">Токен отмены для асинхронной операции</param>
+    /// <returns>Task, представляющий асинхронную операцию массовой отправки</returns>
+    /// <remarks>
+    /// Метод преобразует простые идентификаторы чатов в кортежи с null threadId
+    /// и делегирует отправку основному методу SendMessagesAsync
+    /// </remarks>
     private Task SendMessagesAsync(
         IEnumerable<long> chats,
         string message,
         ReplyMarkup? replyMarkup = null,
         CancellationToken cancellationToken = default)
     {
-        //
+        // Преобразуем плоский список ID чатов в кортежи (chatId, null threadId)
         var chatsToSend = chats.Select(c => new ValueTuple<long, int?>(c, null));
 
-        //
+        // Вызываем основной метод отправки с преобразованными данными
         return SendMessagesAsync(chatsToSend, message, replyMarkup, cancellationToken);
     }
 
@@ -508,6 +558,7 @@ public class NotificationService(
     /// </summary>
     /// <param name="chats">Список ID пользователей.</param>
     /// <param name="message">Текст сообщения.</param>
+    /// <param name="replyMarkup">Опциональная клавиатура или разметка для сообщения.</param>
     /// <param name="cancellationToken">Токен отмены для асинхронной операции.</param>
     /// <returns>Задача, представляющая асинхронную операцию.</returns>
     private async Task SendMessagesAsync(

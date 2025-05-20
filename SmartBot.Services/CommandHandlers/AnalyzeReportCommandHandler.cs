@@ -1,10 +1,9 @@
 ﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Configuration;
-using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
+using SmartBot.Abstractions.Interfaces.Notification;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer;
 using SmartBot.Abstractions.Interfaces.ReportAnalyzer.DTOs;
 using SmartBot.Abstractions.Interfaces.Storage;
@@ -12,10 +11,8 @@ using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
-using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using User = SmartBot.Abstractions.Models.Users.User;
 
 namespace SmartBot.Services.CommandHandlers;
 
@@ -26,8 +23,7 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
 /// <param name="reportAnalyzer">Анализатор отчётов.</param>
 /// <param name="dateTimeProvider">Провайдер для работы с текущим временем.</param>
-/// <param name="logger">Логгер.</param>
-/// <param name="options">Настройки параллелизма для рассылки сообщений.</param>
+/// <param name="notificationService">Сервис рассылки уведомлений.</param>
 /// <param name="analyzerConfiguration">Конфигурация анализатора отчётов.</param>
 /// <param name="synchronizationService">Сервис синхронизации пользователей.</param>
 /// <param name="motivationalMessageService">Сервис отправки мотивации на основании текста отчёта.</param>
@@ -36,11 +32,10 @@ public class AnalyzeReportCommandHandler(
     IUnitOfWork unitOfWork,
     IReportAnalyzer reportAnalyzer,
     IDateTimeProvider dateTimeProvider,
-    ParallelOptions options,
+    INotificationService notificationService,
     ReportAnalysisConfiguration analyzerConfiguration,
     IUserSynchronizationService synchronizationService,
-    IMotivationalMessageService motivationalMessageService,
-    ILogger<AnalyzeReportCommandHandler> logger)
+    IMotivationalMessageService motivationalMessageService)
     : IRequestHandler<AnalyzeReportCommand>
 {
     /// <summary>
@@ -50,7 +45,7 @@ public class AnalyzeReportCommandHandler(
     private const string MorningSuccessMessage =
         "<b>Отличный утренний отчёт! ✅</b>\n\n" +
         "Теперь вы готовы к продуктивному дню! Не забывайте следить за своими целями и задачами. " +
-        "Вечерний отчёт можно будет отправить после 18:00, чтобы подвести итоги дня.";
+        "Вечерний отчёт можно будет отправить после 17:00, чтобы подвести итоги дня.";
 
     /// <summary>
     /// Сообщение, которое отправляется пользователю после успешного анализа и сохранения вечернего отчёта.
@@ -105,21 +100,10 @@ public class AnalyzeReportCommandHandler(
     // Также указывает, что пользователь получит уведомление, когда наступит время для отправки отчёта.
     private const string ReportTimeRestrictionMessage =
         "<b>Сейчас не время для отправки отчёта. ⏰</b>\n\n" +
-        "Утренние отчёты принимаются с <b>9:00 до 10:00</b> по МСК, " +
-        "а вечерние — с <b>18:00 до 19:00</b> по МСК. " +
+        "Утренние отчёты принимаются с <b>8:00 до 10:00</b> по МСК, " +
+        "а вечерние — с <b>17:00 до 20:00</b> по МСК. " +
         "Я отправлю вам уведомление, когда наступит время для отправки отчёта. 🛎";
-
-    /// <summary>
-    /// Сообщение для администратора о новом отчёте пользователя.
-    /// Содержит имя пользователя и текст отчёта, а также приглашение оставить комментарий.
-    /// </summary>
-    private const string ReportSubmissionMessage =
-        "📄 <b>Новый отчёт от пользователя</b> <i>{0}</i>\n" +
-        "🧑‍🏭 <b>Должность:</b> <i>{1}</i>\n\n" +
-        "👇 <b>Текст отчёта:</b>\n" +
-        "<blockquote>{2}</blockquote>\n\n" +
-        "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
-
+    
     /// <summary>
     /// Шаблон сообщения о просрочке утреннего отчёта.
     /// </summary>
@@ -222,7 +206,7 @@ public class AnalyzeReportCommandHandler(
         // Уведомляем администраторов о новом отчёте:
         // - всем администраторам системы
         // - в рабочий чат пользователя (если указан)
-        await NotifyAdminsAsync(request, report);
+        await notificationService.NotifyNewReportAsync(report, token: ct);
 
         // Если анализатор включен, отправляем дополнительные сообщения:
         // - утренняя мотивация и рекомендации
@@ -310,6 +294,7 @@ public class AnalyzeReportCommandHandler(
     {
         // Запрашиваем отчёт из базы данных по ID пользователя и дате
         return await unitOfWork.Query<Report>()
+            .Include(r => r.User)
             .Where(r => r.UserId == request.TelegramUserId)
             .Where(r => r.Date.Date == now.Date)
             .FirstOrDefaultAsync(ct);
@@ -429,7 +414,7 @@ public class AnalyzeReportCommandHandler(
                 replyParameters: new ReplyParameters { MessageId = request.MessageId },
                 chatId: request.ChatId,
                 text: string.Format(ErrorMessage, analysisResult.Score, analysisResult.Recommendations),
-                replyMarkup: DefaultKeyboard.SendReportWithoutAnalysisKeyboard,
+                replyMarkup: DefaultKeyboard.SendForManualAnalysisCallbackData,
                 parseMode: ParseMode.Html,
                 cancellationToken: ct
             );
@@ -464,6 +449,7 @@ public class AnalyzeReportCommandHandler(
             {
                 // Устанавливаем связь с пользователем
                 UserId = request.User!.Id,
+                User = request.User,
 
                 // Фиксируем текущую дату
                 Date = now,
@@ -475,7 +461,13 @@ public class AnalyzeReportCommandHandler(
                     Data = request.Report!,
 
                     // Проверяем просрочку отправки утреннего отчета
-                    Overdue = now.MorningReportOverdue()
+                    Overdue = now.MorningReportOverdue(),
+                    
+                    // Устанавливаем дату сдачи отчёта
+                    Date = now,
+                    
+                    // Отмечаем, что отчёт принят системой
+                    ApprovedBySystem = true
                 }
             };
 
@@ -492,7 +484,13 @@ public class AnalyzeReportCommandHandler(
                 Data = request.Report!,
 
                 // Проверяем просрочку отправки вечернего отчета
-                Overdue = now.EveningReportOverdue()
+                Overdue = now.EveningReportOverdue(),
+                
+                // Устанавливаем дату сдачи отчёта
+                Date = now,
+                
+                // Отмечаем, что отчёт принят системой
+                ApprovedBySystem = true
             };
         }
 
@@ -504,59 +502,6 @@ public class AnalyzeReportCommandHandler(
 
         // Возвращаем обновленный/созданный объект отчета
         return report;
-    }
-
-    /// <summary>
-    /// Отправляет уведомления о сохранении отчёта пользователю и администраторам.
-    /// </summary>
-    /// <param name="request">Запрос с данными отчёта.</param>
-    /// <param name="report">Объект отчёта.</param>
-    private async Task NotifyAdminsAsync(AnalyzeReportCommand request, Report report)
-    {
-        // Получаем список администраторов
-        var admins = await unitOfWork
-            .Query<User>()
-            .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
-            .Select(u => u.Id)
-            .ToListAsync(CancellationToken.None);
-
-        // Формируем список чатов для уведомлений
-        var chatsToNotify = admins
-            .Where(a => a != request.User!.Id)
-            .Select(a => new ValueTuple<long, int?>(a, null))
-            .ToList();
-
-        // Добавляем рабочий чат пользователя, если он есть
-        if (request.User!.WorkingChat != null)
-        {
-            chatsToNotify.Add(new ValueTuple<long, int?>(
-                request.User.WorkingChat.Id,
-                request.User.WorkingChat.MessageThreadId));
-        }
-
-        // Параллельно отправляем уведомления администраторам
-        await Parallel.ForEachAsync(chatsToNotify, options, async (chat, ct) =>
-        {
-            try
-            {
-                await client.SendMessage(
-                    chatId: chat.Item1,
-                    messageThreadId: chat.Item2,
-                    text: string.Format(
-                        ReportSubmissionMessage,
-                        request.User?.FullName,
-                        request.User?.Position,
-                        request.Report),
-                    parseMode: ParseMode.Html,
-                    replyMarkup: AdminKeyboard.ExamReportKeyboard(report.Id, report.EveningReport != null),
-                    cancellationToken: ct
-                );
-            }
-            catch (ApiRequestException ex)
-            {
-                logger.LogWarning(ex, "Failed to send report submission notification to chat {ChatId}.", chat.Item1);
-            }
-        });
     }
 
     /// <summary>

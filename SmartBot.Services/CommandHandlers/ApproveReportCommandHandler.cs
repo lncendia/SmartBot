@@ -8,7 +8,6 @@ using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Services.Extensions;
 using Telegram.Bot;
-using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
@@ -39,7 +38,7 @@ public class ApproveReportCommandHandler(
     private const string MorningSuccessMessage =
         "<b>Ваш отчёт был проверен и принят! ✅</b>\n\n" +
         "Теперь вы готовы к продуктивному дню! Не забывайте следить за своими целями и задачами. " +
-        "Вечерний отчёт можно будет отправить после 18:00, чтобы подвести итоги дня.";
+        "Вечерний отчёт можно будет отправить после 17:00, чтобы подвести итоги дня.";
 
     /// <summary>
     /// Сообщение, которое отправляется пользователю после успешного анализа и сохранения вечернего отчёта.
@@ -62,6 +61,16 @@ public class ApproveReportCommandHandler(
     /// Сообщение, которое отправляется, если отчёт не найден.
     /// </summary>
     private const string ReportNotFoundMessage = "❌ Отчёт не найден.";
+    
+    /// <summary>
+    /// Сообщение, которое отправляется, если отчёт уже подтвержден и не может быть отклонен.
+    /// </summary>
+    private const string ReportAlreadyApprovedMessage = "⚠️ Отчёт уже был подтвержден.";
+
+    /// <summary>
+    /// Сообщение, которое отправляется, если отчёт успешно подтвержден.
+    /// </summary>
+    private const string ReportSuccessfullyApprovedMessage = "✅ Отчёт успешно подтвержден.";
 
     /// <summary>
     /// Обрабатывает команду анализа отчёта.
@@ -119,13 +128,13 @@ public class ApproveReportCommandHandler(
             return;
         }
 
-        // Если это не сегодняшний отчёт
-        if (report.Date.Date != dateTimeProvider.Now.Date)
+        // Если отчёт уже был принят
+        if (report.GetReport(request.EveningReport)!.IsApproved)
         {
             // Отправляем сообщение о том, что отчёт не найден
             await client.AnswerCallbackQuery(
                 callbackQueryId: request.CallbackQueryId,
-                text: ReportNotFoundMessage,
+                text: ReportAlreadyApprovedMessage,
                 cancellationToken: ct
             );
 
@@ -136,46 +145,28 @@ public class ApproveReportCommandHandler(
             return;
         }
 
-        if (request.EveningReport)
-        {
-            report.EveningReport!.Approved = true;
-        }
-        else
-        {
-            report.MorningReport.Approved = true;
-        }
+        //
+        report.GetReport(request.EveningReport)!.Approved = true;
+        
+        // Отправляем сообщение о том, что отчёт не найден
+        await client.AnswerCallbackQuery(
+            callbackQueryId: request.CallbackQueryId,
+            text: ReportSuccessfullyApprovedMessage,
+            cancellationToken: ct
+        );
 
-        try
-        {
-            // Редактируем существующее сообщение с информацией о процессе назначения
-            await client.EditMessageText(
-                chatId: request.ChatId,
-                messageId: request.MessageId,
-                text: infoMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: ct
-            );
-        }
-        catch (ApiRequestException)
-        {
-            // Если редактирование сообщения не удалось, отправляем новое сообщение
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: infoMessage,
-                parseMode: ParseMode.Html,
-                cancellationToken: ct
-            );
-        }
+        // Удаляем сообщение с командой
+        await request.TryDeleteMessageAsync(client, ct);
 
         // Отправляем пользователю сообщение об успешной отправке:
         // - разный текст для утреннего/вечернего отчёта
         // - уведомление о просрочке при необходимости
-        var message = await SendSuccessMessageToUserAsync(report.UserId, report);
+        var message = await SendSuccessMessageToUserAsync(request.EveningReport, report.UserId);
 
         // Уведомляем администраторов о новом отчёте:
         // - всем администраторам системы
         // - в рабочий чат пользователя (если указан)
-        await notificationService.NotifyNewRepostAsync(report, request.User!, ct);
+        await notificationService.NotifyNewReportAsync(report, request.User!, ct);
 
         // Если анализатор включен, отправляем дополнительные сообщения:
         // - утренняя мотивация и рекомендации
@@ -192,41 +183,42 @@ public class ApproveReportCommandHandler(
     /// <summary>
     /// Отправляет сообщение об успешном сохранении отчёта пользователю.
     /// </summary>
+    /// <param name="eveningReport">Флаг, является ли отчёт вечерним</param>
     /// <param name="chatId">Идентификатор чата с пользователем.</param>
-    /// <param name="report">Объект отчёта.</param>
-    private async Task<Message> SendSuccessMessageToUserAsync(ChatId chatId, Report report)
+    private async Task<Message> SendSuccessMessageToUserAsync(bool eveningReport, ChatId chatId)
     {
-        if (report.EveningReport == null)
+        // Если вечерний отчёт
+        if (eveningReport)
         {
-            // Отправляем сообщение об успешном сохранении утреннего отчёта
-            var message = await client.SendMessage(
+            // Отправляем сообщение об успешном сохранении вечернего отчёта
+            return await client.SendMessage(
                 chatId: chatId,
-                text: MorningSuccessMessage,
+                text: EveningSuccessMessage,
                 parseMode: ParseMode.Html,
                 cancellationToken: CancellationToken.None
             );
-
-            // Если сейчас время вечернего отчёта, напоминаем о нём
-            if (dateTimeProvider.Now.IsEveningPeriod())
-            {
-                await client.SendMessage(
-                    chatId: chatId,
-                    text: EveningReportDueMessage,
-                    parseMode: ParseMode.Html,
-                    cancellationToken: CancellationToken.None
-                );
-            }
-
-            // Возвращаем сообщение
-            return message;
         }
 
-        // Отправляем сообщение об успешном сохранении вечернего отчёта
-        return await client.SendMessage(
+        // Отправляем сообщение об успешном сохранении утреннего отчёта
+        var message = await client.SendMessage(
             chatId: chatId,
-            text: EveningSuccessMessage,
+            text: MorningSuccessMessage,
             parseMode: ParseMode.Html,
             cancellationToken: CancellationToken.None
         );
+
+        // Если сейчас время вечернего отчёта, напоминаем о нём
+        if (dateTimeProvider.Now.IsEveningPeriod())
+        {
+            await client.SendMessage(
+                chatId: chatId,
+                text: EveningReportDueMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: CancellationToken.None
+            );
+        }
+
+        // Возвращаем сообщение
+        return message;
     }
 }

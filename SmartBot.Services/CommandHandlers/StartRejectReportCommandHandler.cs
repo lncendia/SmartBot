@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces.Storage;
-using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Abstractions.Models.Users;
 using SmartBot.Services.Extensions;
@@ -14,16 +13,12 @@ using Telegram.Bot.Types.Enums;
 namespace SmartBot.Services.CommandHandlers;
 
 /// <summary>
-/// Обработчик команды для начала ввода комментария к отчёту.
+/// Обработчик команды для начала отклонения отчёта.
 /// </summary>
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
-/// <param name="dateTimeProvider">Провайдер для работы с текущим временем.</param>
-public class StartCommentCommandHandler(
-    ITelegramBotClient client,
-    IUnitOfWork unitOfWork,
-    IDateTimeProvider dateTimeProvider)
-    : IRequestHandler<StartCommentCommand>
+public class StartRejectReportCommandHandler(ITelegramBotClient client, IUnitOfWork unitOfWork)
+    : IRequestHandler<StartRejectReportCommand>
 {
     /// <summary>
     /// Сообщение, которое отправляется, если отчёт не найден.
@@ -31,23 +26,25 @@ public class StartCommentCommandHandler(
     private const string ReportNotFoundMessage = "❌ Отчёт не найден.";
 
     /// <summary>
-    /// Сообщение, которое отправляется администратору для ввода комментария.
+    /// Сообщение с инструкцией для администратора при отклонении отчёта.
+    /// Запрашивает указание конкретных замечаний и причин отклонения.
     /// </summary>
-    private const string AwaitingCommentMessage =
-        "<b>📝 Введите комментарий к отчёту:</b>\n\n" +
-        "Пожалуйста, укажите ваши замечания или рекомендации для улучшения отчёта.";
+    private const string RejectionFeedbackMessage =
+        "<b>✏️ Укажите причину отклонения отчёта:</b>\n\n" +
+        "Опишите, что именно нужно исправить в отчёте.\n" +
+        "Это сообщение будет отправлено пользователю.";
 
     /// <summary>
-    /// Сообщение, которое отправляется, если отчёт уже выгружен и комментарий не может быть добавлен.
+    /// Сообщение, которое отправляется, если отчёт уже подтвержден и не может быть отклонен.
     /// </summary>
-    private const string ReportAlreadyExportedMessage = "⚠️ Отчёт уже выгружен.";
+    private const string ReportAlreadyApprovedMessage = "⚠️ Отчёт уже был подтвержден.";
 
     /// <summary>
     /// Обрабатывает команду начала ввода комментария к отчёту.
     /// </summary>
     /// <param name="request">Запрос, содержащий данные о команде.</param>
     /// <param name="cancellationToken">Токен отмены операции.</param>
-    public async Task Handle(StartCommentCommand request, CancellationToken cancellationToken)
+    public async Task Handle(StartRejectReportCommand request, CancellationToken cancellationToken)
     {
         // Проверяем, является ли пользователь администратором
         if (!await request.CheckAdminAsync(client, cancellationToken)) return;
@@ -74,13 +71,13 @@ public class StartCommentCommandHandler(
             return;
         }
 
-        // Если это не сегодняшний отчёт
-        if (report.Date.Date != dateTimeProvider.Now.Date)
+        // Если отчёт уже был принят
+        if (report.GetReport(request.EveningReport)!.IsApproved)
         {
             // Отправляем сообщение о том, что это не сегодняшний отчёт
             await client.AnswerCallbackQuery(
                 callbackQueryId: request.CallbackQueryId,
-                text: ReportAlreadyExportedMessage,
+                text: ReportAlreadyApprovedMessage,
                 cancellationToken: cancellationToken
             );
 
@@ -101,8 +98,8 @@ public class StartCommentCommandHandler(
             EveningReport = request.EveningReport
         };
 
-        // Устанавливаем состояние пользователя на AwaitingCommentInput
-        request.User.State = State.AwaitingCommentInput;
+        // Устанавливаем состояние пользователя на AwaitingDenyCommentInput
+        request.User.State = State.AwaitingRejectCommentInput;
 
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -110,7 +107,7 @@ public class StartCommentCommandHandler(
         // Отправляем сообщение с запросом на ввод комментария
         await client.SendMessage(
             chatId: request.ChatId,
-            text: AwaitingCommentMessage,
+            text: RejectionFeedbackMessage,
             parseMode: ParseMode.Html,
             replyMarkup: DefaultKeyboard.CancelKeyboard,
             cancellationToken: CancellationToken.None

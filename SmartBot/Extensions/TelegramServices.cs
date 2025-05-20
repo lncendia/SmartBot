@@ -61,6 +61,9 @@ public static class TelegramServices
 
         // Регистрируем сервис синхронизации действий пользователей
         services.AddSingleton<IUserSynchronizationService, UserSynchronizationService>();
+        
+        // Регистрируем cервис для отправки мотивационных сообщений пользователям на основе их отчетов
+        services.AddScoped<IMotivationalMessageService, MotivationalMessageService>();
 
         // Регистрируем настройки вебхука
         services.AddSingleton(webhookSettings);

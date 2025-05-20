@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Interfaces.Storage;
-using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Reports;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
@@ -20,12 +19,11 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
 /// <param name="logger">Логгер для записи событий.</param>
-public class AddCommentCommandHandler(
+public class RejectReportCommandHandler(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
-    IDateTimeProvider dateTimeProvider,
-    ILogger<AddCommentCommandHandler> logger)
-    : IRequestHandler<AddCommentCommand>
+    ILogger<RejectReportCommandHandler> logger)
+    : IRequestHandler<RejectReportCommand>
 {
     /// <summary>
     /// Сообщение, которое отправляется, если отчёт не найден.
@@ -40,10 +38,10 @@ public class AddCommentCommandHandler(
         "<b>❌ Ошибка:</b> Комментарий не может быть пустым. Пожалуйста, введите текст комментария.";
 
     /// <summary>
-    /// Сообщение, которое отправляется, если суммарная длина комментария превышает 2000 символов.
+    /// Сообщение, которое отправляется, если суммарная длина комментария превышает 4000 символов.
     /// </summary>
     private const string CommentTooLongMessage =
-        "<b>❌ Ошибка:</b> Суммарная длина комментария превышает 2000 символов. Пожалуйста, сократите текст.";
+        "<b>❌ Ошибка:</b> Суммарная длина комментария превышает 4000 символов. Пожалуйста, сократите текст.";
 
     /// <summary>
     /// Сообщение об успешном добавлении комментария.
@@ -79,7 +77,7 @@ public class AddCommentCommandHandler(
     /// </summary>
     /// <param name="request">Запрос, содержащий данные о команде.</param>
     /// <param name="cancellationToken">Токен отмены операции.</param>
-    public async Task Handle(AddCommentCommand request, CancellationToken cancellationToken)
+    public async Task Handle(RejectReportCommand request, CancellationToken cancellationToken)
     {
         // Проверяем, что комментарий не пустой
         if (string.IsNullOrWhiteSpace(request.Comment))
@@ -88,6 +86,22 @@ public class AddCommentCommandHandler(
             await client.SendMessage(
                 chatId: request.ChatId,
                 text: EmptyCommentMessage,
+                parseMode: ParseMode.Html,
+                replyMarkup: DefaultKeyboard.CancelKeyboard,
+                cancellationToken: cancellationToken
+            );
+
+            // Завершаем выполнение метода
+            return;
+        }
+
+        // Проверяем, не превышает ли длина комментария 4000 символов
+        if (request.Comment.Length > 4000)
+        {
+            // Отправляем сообщение о превышении длины комментария
+            await client.SendMessage(
+                chatId: request.ChatId,
+                text: CommentTooLongMessage,
                 parseMode: ParseMode.Html,
                 replyMarkup: DefaultKeyboard.CancelKeyboard,
                 cancellationToken: cancellationToken
@@ -123,7 +137,7 @@ public class AddCommentCommandHandler(
             .FirstOrDefaultAsync(r => r.Id == request.User!.ReviewingReport.ReportId, cancellationToken);
 
         // Если отчёт не найден
-        if (report == null)
+        if (report == null || (request.User!.ReviewingReport.EveningReport && report.EveningReport == null))
         {
             // Обновляем состояние пользователя и уведомляем об отсутствии отчёта
             await UpdateStateAndSendMessageAsync(
@@ -137,8 +151,8 @@ public class AddCommentCommandHandler(
             return;
         }
 
-        // Если это не сегодняшний отчёт
-        if (report.Date.Date != dateTimeProvider.Now.Date)
+        // Если отчёт уже был принят
+        if (report.GetReport(request.User!.ReviewingReport.EveningReport)!.IsApproved)
         {
             // Обновляем состояние пользователя и уведомляем о том, что это не сегодняшний отчёт
             await UpdateStateAndSendMessageAsync(
@@ -152,36 +166,14 @@ public class AddCommentCommandHandler(
             return;
         }
 
-        // Формируем новый комментарий
-        var newComment = $"— {request.User.FullName} ({request.User.Position}): {request.Comment}";
-
-        // Если у отчёта уже есть комментарий, добавляем два пропуска строки и новый комментарий
-        if (!string.IsNullOrEmpty(report.Comment))
-        {
-            newComment = $"{report.Comment}\n\n{newComment}";
-        }
-
-        // Проверяем, не превышает ли длина комментария 2000 символов
-        if (newComment.Length > 2000)
-        {
-            // Отправляем сообщение о превышении длины комментария
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: CommentTooLongMessage,
-                parseMode: ParseMode.Html,
-                replyMarkup: DefaultKeyboard.CancelKeyboard,
-                cancellationToken: cancellationToken
-            );
-
-            // Завершаем выполнение метода
-            return;
-        }
-
-        // Обновляем комментарий отчёта
-        report.Comment = newComment;
-
         // Запоминаем данные сообщения, на которое пользователь отвечает для дальнейшей отправки ответного сообщения
         var reviewingReport = request.User!.ReviewingReport;
+
+        //
+        if (reviewingReport.EveningReport) report.EveningReport = null;
+        
+        //
+        else await unitOfWork.DeleteAsync(report, cancellationToken);
 
         // Обновляем состояние пользователя и уведомляем об успешном добавлении комментария
         await UpdateStateAndSendMessageAsync(
@@ -243,7 +235,7 @@ public class AddCommentCommandHandler(
     /// <param name="newState">Новое состояние пользователя</param>
     /// <param name="message">Текст сообщения для отправки</param>
     /// <param name="cancellationToken">Токен отмены операции</param>
-    private async Task UpdateStateAndSendMessageAsync(AddCommentCommand request, State newState, string message,
+    private async Task UpdateStateAndSendMessageAsync(RejectReportCommand request, State newState, string message,
         CancellationToken cancellationToken)
     {
         // Обновляем состояние пользователя (например, возвращаем в Idle или AwaitingReportInput)

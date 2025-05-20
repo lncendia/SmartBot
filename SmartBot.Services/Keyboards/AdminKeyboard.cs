@@ -10,7 +10,19 @@ public static class AdminKeyboard
     /// <summary>
     /// Префикс для callback-данных кнопки "Оставить комментарий".
     /// </summary>
-    public const string ExamReportCallbackData = "exam_";
+    public const string CommentReportCallbackData = "comment_";
+    
+    /// <summary>
+    /// Префикс для callback-данных кнопки подтверждения отчёта.
+    /// Формат: "approve_[reportId]_[isEveningReport]"
+    /// </summary>
+    public const string ApproveReportCallbackData = "approve_";
+
+    /// <summary>
+    /// Префикс для callback-данных кнопки отклонения отчёта.
+    /// Формат: "reject_[reportId]_[isEveningReport]"
+    /// </summary>
+    public const string RejectReportCallbackData = "reject_";
 
     /// <summary>
     /// Callback-данные для кнопки "Назад".
@@ -124,16 +136,46 @@ public static class AdminKeyboard
     /// <param name="reportId">Идентификатор отчёта, к которому будет привязан комментарий.</param>
     /// <param name="isEveningReport">Флаг вечернего отчёта.</param>
     /// <returns>Клавиатура с кнопкой для оставления комментария.</returns>
-    public static InlineKeyboardMarkup ExamReportKeyboard(Guid reportId, bool isEveningReport)
+    public static InlineKeyboardMarkup CommentReportKeyboard(Guid reportId, bool isEveningReport)
     {
         // Создаём кнопку с callback-запросом
         var button = InlineKeyboardButton.WithCallbackData(
             text: "Оставить комментарий 👀",
-            callbackData: $"{ExamReportCallbackData}{reportId}_{isEveningReport}"
+            callbackData: $"{CommentReportCallbackData}{reportId}_{isEveningReport}"
         );
 
         // Возвращаем клавиатуру с одной кнопкой
         return new InlineKeyboardMarkup(button);
+    }
+    
+    /// <summary>
+    /// Создаёт интерактивную клавиатуру для администраторов с действиями по отчёту
+    /// </summary>
+    /// <param name="reportId">Идентификатор отчёта для привязки действий</param>
+    /// <param name="isEveningReport">Флаг, указывающий на тип отчёта (true - вечерний, false - утренний)</param>
+    /// <returns>Клавиатура с кнопками подтверждения и отклонения отчёта</returns>
+    public static InlineKeyboardMarkup VerifyReportKeyboard(Guid reportId, bool isEveningReport)
+    {
+        var keyboard = new List<List<InlineKeyboardButton>>
+        {
+            new()
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "✅ Подтвердить",
+                    callbackData: $"{ApproveReportCallbackData}{reportId}_{isEveningReport}"
+                )
+            },
+            new()
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "❌ Отклонить",
+                    callbackData: $"{RejectReportCallbackData}{reportId}_{isEveningReport}"
+                )
+            }
+        };
+        
+        // Возвращаем клавиатуру
+        return new InlineKeyboardMarkup(keyboard);
     }
 
     /// <summary>

@@ -49,18 +49,35 @@ public interface INotificationService
     Task NotifyMorningReportMissedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Уведомляет о том, что вечерний отчёт не был сдан.
+    /// Уведомляет пользователя о том, что вечерний отчёт не был сдан в установленный срок.
     /// </summary>
+    /// <param name="cancellationToken">Токен отмены для асинхронной операции</param>
     /// <remarks>
-    /// Этот метод вызывается, если вечерний отчёт не был сдан в установленный срок.
+    /// Отправляет пользователю напоминание о необходимости сдать пропущенный вечерний отчёт.
+    /// Включает информацию о последствиях пропуска отчёта.
     /// </remarks>
     Task NotifyEveningReportMissedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Отправляет уведомления о сохранении отчёта пользователю и администраторам.
+    /// Уведомляет о создании нового отчёта.
     /// </summary>
-    /// <param name="request">Запрос с данными отчёта.</param>
-    /// <param name="report">Объект отчёта.</param>
-    /// <param name="reportText">Текст отчёта.</param>
-    Task NotifyNewRepostAsync(Report report, User? reviewer, CancellationToken token = default);
+    /// <param name="report">Объект отчёта, содержащий данные для проверки</param>
+    /// <param name="reviewer">Администратор, который проверил отчёт. 
+    /// Если null - отчёт проверен автоматически.</param>
+    /// <param name="token">Токен отмены для асинхронной операции</param>
+    /// <remarks>
+    /// Используется для оповещения администраторов о новых отчётах.
+    /// </remarks>
+    Task NotifyNewReportAsync(Report report, User? reviewer = null, CancellationToken token = default);
+
+    /// <summary>
+    /// Уведомляет о необходимости анализа и проверки отчёта.
+    /// </summary>
+    /// <param name="report">Объект отчёта, требующий проверки</param>
+    /// <param name="token">Токен отмены для асинхронной операции</param>
+    /// <remarks>
+    /// Отправляется администраторам для ручной проверки отчётов,
+    /// которые не могут быть автоматически обработаны системой.
+    /// </remarks>
+    Task NotifyVerifyReportAsync(Report report, CancellationToken token = default);
 }

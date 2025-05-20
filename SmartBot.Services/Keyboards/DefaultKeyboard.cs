@@ -18,9 +18,9 @@ public static class DefaultKeyboard
     public const string AnswerCallbackData = "answer_";
 
     /// <summary>
-    /// Callback-данные для отправки отчета без анализа
+    /// Callback-данные для отправки отчета на ручной анализ
     /// </summary>
-    public const string SendWithoutAnalysisCallbackData = "send_without_analysis";
+    public const string SendForManualAnalysisCallbackData = "send_manual_analysis";
     
     /// <summary>
     /// Callback-данные для повторного анализа отчёта
@@ -38,18 +38,18 @@ public static class DefaultKeyboard
     );
 
     /// <summary>
-    /// Клавиатура с опцией отправки отчета без проверки ИИ
+    /// Клавиатура с опцией отправки отчёта на ручную модерацию
     /// </summary>
     /// <remarks>
-    /// Используется когда:
-    /// - Система анализа не доступна
-    /// - Пользователь хочет пропусить автоматическую проверку
-    /// - Принудительная отправка при проблемах с анализом
+    /// Используется в следующих случаях:
+    /// - Система автоматического анализа недоступна
+    /// - Требуется принудительная отправка на проверку модератору
+    /// - Обнаружены проблемы при автоматической обработке отчёта
     /// </remarks>
-    public static InlineKeyboardMarkup SendReportWithoutAnalysisKeyboard { get; } = new(
+    public static InlineKeyboardMarkup SendReportForManualAnalysisKeyboard { get; } = new(
         InlineKeyboardButton.WithCallbackData(
-            text: "⚠️ Отправить без проверки",
-            callbackData: SendWithoutAnalysisCallbackData
+            text: "📝 Отправить на ручную проверку",
+            callbackData: SendForManualAnalysisCallbackData
         )
     );
 
@@ -74,8 +74,8 @@ public static class DefaultKeyboard
             new()
             {
                 InlineKeyboardButton.WithCallbackData(
-                    text: "⚠️ Отправить без проверки",
-                    callbackData: SendWithoutAnalysisCallbackData
+                    text: "📝 Отправить на ручную проверку",
+                    callbackData: SendForManualAnalysisCallbackData
                 )
             },
         }

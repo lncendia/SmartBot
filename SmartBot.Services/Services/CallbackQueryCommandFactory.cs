@@ -32,34 +32,6 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
         // Проверяем, находится ли пользователь в состоянии Idle или AwaitingReportInput
         if (user.State is State.Idle or State.AwaitingReportInput)
         {
-            // Проверяем, является ли callback-данные командой для работы с экзаменационным отчетом
-            if (query.Data.StartsWith(AdminKeyboard.ExamReportCallbackData))
-            {
-                // Разбиваем callback-данные на составные части по разделителю '_'
-                var data = query.Data.Split('_');
-
-                // Валидация: проверяем, что данные содержат 3 элемента (префикс, reportId, eveningReport)
-                if (data.Length != 3) return null;
-
-                // Парсим второй элемент данных как Guid (идентификатор отчета)
-                if (!Guid.TryParse(data[1], out var reportId)) return null;
-
-                // Парсим третий элемент данных как boolean (флаг вечернего отчета)
-                if (!bool.TryParse(data[2], out var eveningReport)) return null;
-
-                // Создаем и возвращаем команду для начала ввода комментария к отчету
-                return new StartCommentCommand
-                {
-                    ChatId = query.From.Id,
-                    MessageId = query.Message!.Id,
-                    TelegramUserId = query.From.Id,
-                    User = user,
-                    ReportId = reportId,
-                    CallbackQueryId = query.Id,
-                    EveningReport = eveningReport
-                };
-            }
-
             // Проверяем, является ли callback-данные командой ответа на комментарий
             if (query.Data.StartsWith(DefaultKeyboard.AnswerCallbackData))
             {
@@ -93,7 +65,94 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если пользователь находится в состоянии Idle и данные начинаются с префикса DeleteChatCallbackData
+            // Следующие команды только для администраторов
+            if (!user.IsAdmin) return null;
+            
+            // Проверяем, является ли callback-данные командой для комментирования отчета
+            if (query.Data.StartsWith(AdminKeyboard.CommentReportCallbackData))
+            {
+                // Разбиваем callback-данные на составные части по разделителю '_'
+                var data = query.Data.Split('_');
+
+                // Валидация: проверяем, что данные содержат 3 элемента (префикс, reportId, eveningReport)
+                if (data.Length != 3) return null;
+
+                // Парсим второй элемент данных как Guid (идентификатор отчета)
+                if (!Guid.TryParse(data[1], out var reportId)) return null;
+
+                // Парсим третий элемент данных как boolean (флаг вечернего отчета)
+                if (!bool.TryParse(data[2], out var eveningReport)) return null;
+
+                // Создаем и возвращаем команду для начала ввода комментария к отчету
+                return new StartCommentCommand
+                {
+                    ChatId = query.From.Id,
+                    MessageId = query.Message!.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    ReportId = reportId,
+                    CallbackQueryId = query.Id,
+                    EveningReport = eveningReport
+                };
+            }
+            
+            // Проверяем, является ли callback-данные командой для подтверждения отчёта
+            if (query.Data.StartsWith(AdminKeyboard.ApproveReportCallbackData))
+            {
+                // Разбиваем callback-данные на составные части по разделителю '_'
+                var data = query.Data.Split('_');
+
+                // Валидация: проверяем, что данные содержат 3 элемента (префикс, reportId, eveningReport)
+                if (data.Length != 3) return null;
+
+                // Парсим второй элемент данных как Guid (идентификатор отчета)
+                if (!Guid.TryParse(data[1], out var reportId)) return null;
+
+                // Парсим третий элемент данных как boolean (флаг вечернего отчета)
+                if (!bool.TryParse(data[2], out var eveningReport)) return null;
+
+                // Создаем и возвращаем команду для начала ввода комментария к отчету
+                return new ApproveReportCommand
+                {
+                    ChatId = query.From.Id,
+                    MessageId = query.Message!.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    ReportId = reportId,
+                    CallbackQueryId = query.Id,
+                    EveningReport = eveningReport
+                };
+            }
+            
+            // Проверяем, является ли callback-данные командой для отклонения отчёта
+            if (query.Data.StartsWith(AdminKeyboard.RejectReportCallbackData))
+            {
+                // Разбиваем callback-данные на составные части по разделителю '_'
+                var data = query.Data.Split('_');
+
+                // Валидация: проверяем, что данные содержат 3 элемента (префикс, reportId, eveningReport)
+                if (data.Length != 3) return null;
+
+                // Парсим второй элемент данных как Guid (идентификатор отчета)
+                if (!Guid.TryParse(data[1], out var reportId)) return null;
+
+                // Парсим третий элемент данных как boolean (флаг вечернего отчета)
+                if (!bool.TryParse(data[2], out var eveningReport)) return null;
+
+                // Создаем и возвращаем команду для начала ввода комментария к отчету
+                return new StartRejectReportCommand
+                {
+                    ChatId = query.From.Id,
+                    MessageId = query.Message!.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    ReportId = reportId,
+                    CallbackQueryId = query.Id,
+                    EveningReport = eveningReport
+                };
+            }
+
+            // Если данные начинаются с префикса DeleteChatCallbackData
             if (query.Data.StartsWith(AdminKeyboard.DeleteChatCallbackData))
             {
                 // Извлекаем ID отчёта из данных callback-запроса
@@ -117,7 +176,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если пользователь находится в состоянии Idle и данные начинаются с префикса SelectChatCallbackData
+            // Если данные начинаются с префикса SelectChatCallbackData
             if (query.Data.StartsWith(AdminKeyboard.SelectChatCallbackData))
             {
                 // Получаем данные из команды
@@ -167,7 +226,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 return null;
             }
 
-            // Если пользователь находится в состоянии Idle и данные начинаются с префикса SelectAdminCallbackData
+            // Если данные начинаются с префикса SelectAdminCallbackData
             if (query.Data.StartsWith(AdminKeyboard.SelectAdminCallbackData))
             {
                 // Получаем флаг необходимости добавления администратора как теле-администратора
@@ -185,7 +244,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если пользователь находится в состоянии Idle и запрошена команда AddWorkingChatCallbackData
+            // Если запрошена команда AddWorkingChatCallbackData
             if (query.Data == AdminKeyboard.AddWorkingChatCallbackData)
             {
                 // Если данные соответствуют AddWorkingChatCallbackData, возвращаем команду для добавления рабочего чата
@@ -199,7 +258,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если пользователь находится в состоянии Idle и запрошена команда RemoveWorkingChatCallbackData
+            // Если запрошена команда RemoveWorkingChatCallbackData
             if (query.Data == AdminKeyboard.RemoveWorkingChatCallbackData)
             {
                 // Если данные соответствуют RemoveWorkingChatCallbackData, возвращаем команду для добавления рабочего чата
@@ -213,7 +272,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если пользователь находится в состоянии Idle и запрошена команда AssignAdminCallbackData
+            // Если запрошена команда AssignAdminCallbackData
             if (query.Data == AdminKeyboard.AssignAdminCallbackData)
             {
                 // Если данные соответствуют AssignAdminCallbackData, возвращаем команду для добавления рабочего чата
@@ -227,7 +286,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если пользователь находится в состоянии Idle и запрошена команда DemoteAdminCallbackData
+            // Если запрошена команда DemoteAdminCallbackData
             if (query.Data == AdminKeyboard.DemoteAdminCallbackData)
             {
                 // Если данные соответствуют DemoteAdminCallbackData, возвращаем команду для добавления рабочего чата
@@ -241,7 +300,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если пользователь находится в состоянии Idle и запрошена команда BlockUserCallbackData
+            // Если запрошена команда BlockUserCallbackData
             if (query.Data == AdminKeyboard.BlockUserCallbackData)
             {
                 // Если данные соответствуют BlockUserCallbackData, возвращаем команду для добавления рабочего чата
@@ -255,7 +314,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если пользователь находится в состоянии Idle и запрошена команда SetWorkingChatCallbackData
+            // Если запрошена команда SetWorkingChatCallbackData
             if (query.Data == AdminKeyboard.SetWorkingChatCallbackData)
             {
                 // Если данные соответствуют AddWorkingChatCallbackData, возвращаем команду для добавления рабочего чата
@@ -274,10 +333,10 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
         if (user.State is State.AwaitingReportInput && query.Message?.ReplyToMessage?.MessageId != null)
         {
             // Проверяем, является ли callback-данные командой для отправки отчёта без проверки анализатором
-            if (query.Data == DefaultKeyboard.SendWithoutAnalysisCallbackData)
+            if (query.Data == DefaultKeyboard.SendForManualAnalysisCallbackData)
             {
                 // Создаем и возвращаем команду для отправки отчёта без проверки анализатором
-                return new SendReportWithoutAnalysisCommand
+                return new ManualReportAnalysisCommand
                 {
                     ChatId = query.From.Id,
                     MessageId = query.Message!.Id,
@@ -287,7 +346,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                     ReportMessageId = query.Message.ReplyToMessage.MessageId
                 };
             }
-            
+
             // Проверяем, является ли callback-данные командой для отправки отчёта на повторный анализ
             if (query.Data == DefaultKeyboard.RepeatAnalysisCallbackData)
             {
@@ -303,9 +362,9 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
         }
-        
+
         // Обработка команды отмены при вводе комментария или ответа
-        if (user.State is State.AwaitingCommentInput or State.AwaitingAnswerInput
+        if (user.State is State.AwaitingCommentInput or State.AwaitingAnswerInput or State.AwaitingRejectCommentInput
             && query.Data == DefaultKeyboard.CancelCallbackData)
         {
             // Создаем команду отмены текущего действия

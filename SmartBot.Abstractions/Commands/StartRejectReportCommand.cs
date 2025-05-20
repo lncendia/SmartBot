@@ -3,9 +3,9 @@
 namespace SmartBot.Abstractions.Commands;
 
 /// <summary>
-/// Команда для начала комментирования отчёта
+/// Команда для начала отклонения отчёта
 /// </summary>
-public class StartCommentCommand : CallbackQueryCommand
+public class StartRejectReportCommand : CallbackQueryCommand
 {
     /// <summary>
     /// Идентификатор отчёта
