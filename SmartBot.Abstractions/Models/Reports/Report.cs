@@ -43,9 +43,10 @@ public class Report
     public string? Comment { get; set; }
 
     /// <summary>
-    /// 
+    /// Возвращает утренний или вечерний отчет в зависимости от параметра
     /// </summary>
-    /// <param name="evening"></param>
-    /// <returns></returns>
+    /// <param name="evening">Флаг определения типа отчета: 
+    /// true - вечерний отчет, false - утренний отчет</param>
+    /// <returns>Соответствующий отчет или null, если отчет не найден</returns>
     public UserReport? GetReport(bool evening) => evening ? EveningReport : MorningReport;
 }

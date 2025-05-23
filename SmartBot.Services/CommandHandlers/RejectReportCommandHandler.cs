@@ -31,39 +31,39 @@ public class RejectReportCommandHandler(
     private const string ReportNotFoundMessage =
         "<b>❌ Ошибка:</b> Отчёт не найден. Возможно, он был удалён.";
 
-    /// <summary>
-    /// Сообщение, которое отправляется, если комментарий пустой.
-    /// </summary>
-    private const string EmptyCommentMessage =
-        "<b>❌ Ошибка:</b> Комментарий не может быть пустым. Пожалуйста, введите текст комментария.";
+    /// <summary>Сообщение при пустом комментарии</summary>
+    private const string EmptyCommentMessage = 
+        "✖️ <b>Не указана причина отклонения</b>\n\n" +
+        "Пожалуйста, напишите комментарий с объяснением причины.";
 
     /// <summary>
     /// Сообщение, которое отправляется, если суммарная длина комментария превышает 4000 символов.
     /// </summary>
     private const string CommentTooLongMessage =
-        "<b>❌ Ошибка:</b> Суммарная длина комментария превышает 4000 символов. Пожалуйста, сократите текст.";
+        "<b>❌ Ошибка:</b> Длина комментария превышает 4000 символов. Пожалуйста, сократите текст.";
 
     /// <summary>
-    /// Сообщение об успешном добавлении комментария.
+    /// Сообщение об успешном отклонении отчёта.
     /// </summary>
-    private const string CommentAddedSuccessMessage =
-        "<b>✅ Комментарий успешно добавлен!</b>\n\n" +
+    private const string ReportRejectedSuccessMessage =
+        "<b>✅ Отчёт успешно отклонен!</b>\n\n" +
         "Теперь вы можете продолжить работу с другими отчётами.";
-
+    
     /// <summary>
     /// Сообщение, которое отправляется, если отчёт уже выгружен и комментарий не может быть добавлен.
     /// </summary>
-    private const string ReportAlreadyExportedMessage =
-        "<b>⚠️ Информация:</b> Отчёт уже выгружен.\n\n" +
-        "Комментарий не может быть добавлен к выгруженному отчёту.";
+    private const string ReportAlreadyApprovedMessage =
+        "<b>⚠️ Информация:</b> Отчёт уже принят.\n\n" +
+        "Принятый отчёт не может быть отклонен.";
 
     /// <summary>
     /// Формат сообщения с отчётом пользователя
     /// </summary>
     private const string ReportMessageFormat =
-        "📝 <b>Новый комментарий на Ваш отчёт</b>\n\n" +
+        "📝 <b>Ваш отчёт был отклонен</b>\n\n" +
         "👇 <b>Текст отчёта:</b>\n" +
-        "<blockquote>{0}</blockquote>\n\n";
+        "<blockquote>{0}</blockquote>\n\n" +
+        "⚠️ <b>Пожалуйста, переделайте отчёт с учётом следующих замечаний</b>";
 
     /// <summary>
     /// Формат сообщения с комментарием к отчёту
@@ -158,7 +158,7 @@ public class RejectReportCommandHandler(
             await UpdateStateAndSendMessageAsync(
                 request: request,
                 newState: newState,
-                message: ReportAlreadyExportedMessage,
+                message: ReportAlreadyApprovedMessage,
                 cancellationToken: cancellationToken
             );
 
@@ -168,28 +168,32 @@ public class RejectReportCommandHandler(
 
         // Запоминаем данные сообщения, на которое пользователь отвечает для дальнейшей отправки ответного сообщения
         var reviewingReport = request.User!.ReviewingReport;
-
-        //
-        if (reviewingReport.EveningReport) report.EveningReport = null;
         
-        //
-        else await unitOfWork.DeleteAsync(report, cancellationToken);
+        // Получаем текст отчёта (утренний или вечерний)
+        var reportText = report.GetReport(reviewingReport.EveningReport)!.Data;
+
+        // Проверяем, существует ли вечерний отчет для удаления
+        if (reviewingReport.EveningReport)
+        {
+            // Удаляем вечерний отчет из базы данных
+            await unitOfWork.DeleteAsync(report.EveningReport!, cancellationToken);
+    
+            // Обнуляем ссылку на вечерний отчет в основном объекте
+            report.EveningReport = null;
+        }
+        else
+        {
+            // Если вечернего отчета нет, удаляем весь отчет целиком
+            await unitOfWork.DeleteAsync(report, cancellationToken);
+        }
 
         // Обновляем состояние пользователя и уведомляем об успешном добавлении комментария
         await UpdateStateAndSendMessageAsync(
             request: request,
             newState: newState,
-            message: CommentAddedSuccessMessage,
+            message: ReportRejectedSuccessMessage,
             cancellationToken: cancellationToken
         );
-
-        // Если автор отчёта заблокирован - не продолжаем
-        if (report.User!.Role == Role.Blocked) return;
-
-        // Получаем текст отчёта (утренний или вечерний)
-        var reportText = reviewingReport.EveningReport
-            ? report.EveningReport?.Data
-            : report.MorningReport.Data;
 
         try
         {
@@ -212,10 +216,6 @@ public class RejectReportCommandHandler(
                     request.User.FullName,
                     request.User.Position,
                     request.Comment),
-                replyMarkup: DefaultKeyboard.AnswerKeyboard(
-                    reviewingReport.ReportId,
-                    request.User.Id,
-                    reviewingReport.EveningReport),
                 chatId: report.UserId,
                 parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken

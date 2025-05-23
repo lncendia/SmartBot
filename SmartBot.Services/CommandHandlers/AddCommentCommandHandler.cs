@@ -191,9 +191,6 @@ public class AddCommentCommandHandler(
             cancellationToken: cancellationToken
         );
 
-        // Если автор отчёта заблокирован - не продолжаем
-        if (report.User!.Role == Role.Blocked) return;
-
         // Получаем текст отчёта (утренний или вечерний)
         var reportText = reviewingReport.EveningReport
             ? report.EveningReport?.Data

@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MediatR;
+using Microsoft.EntityFrameworkCore;
+using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Extensions;
 using SmartBot.Abstractions.Interfaces.Notification;
 using SmartBot.Abstractions.Interfaces.Storage;
@@ -93,6 +95,9 @@ public class ReportApprovalHostedService(
 
             // Инициализируем Unit of Work для работы с базой данных
             var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            
+            // Инициализируем ISender для отправки команд
+            var mediator = scope.ServiceProvider.GetRequiredService<ISender>();
 
             // Получаем сервис уведомлений
             var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
@@ -129,9 +134,6 @@ public class ReportApprovalHostedService(
             {
                 // Помечаем отчёт как автоматически принятый системой
                 report.GetReport(isEveningPeriod)!.ApprovedBySystem = true;
-
-                // Отправляем уведомление о принятии отчёта
-                await notificationService.NotifyNewReportAsync(report);
             }
 
             // Сохраняем все изменения в базе данных
@@ -139,6 +141,23 @@ public class ReportApprovalHostedService(
             
             // Логгируем
             logger.LogInformation("Successfully automatically accepted {ApprovedCount} reports", reports.Length);
+            
+            // Обрабатываем каждый отчет в коллекции
+            foreach (var report in reports)
+            {
+                // Создаем команду для автоматического принятия отчета
+                var command = new AutomaticApproveReportCommand
+                {
+                    // Передаем текущий отчет для обработки
+                    Report = report,
+        
+                    // Указываем тип отчета (утренний/вечерний)
+                    EveningReport = isEveningPeriod
+                };
+    
+                // Отправляем команду на выполнение через медиатор
+                await mediator.Send(command);
+            }
         }
         catch (Exception ex)
         {

@@ -41,6 +41,15 @@ public class ManualReportAnalysisCommandHandler(
         "Вечерний отчёт можно будет отправить после 17:00, чтобы подвести итоги дня.";
 
     /// <summary>
+    /// Сообщение пользователю после отправки отчёта на проверку
+    /// </summary>
+    private const string ReportSubmittedForReviewMessage =
+        "📬 <b>Отчёт отправлен на проверку!</b>\n\n" +
+        "Администратор рассмотрит его в ближайшее время.\n\n" +
+        "⏳ <b>Ожидайте оповещение о результате проверки.</b>\n" +
+        "🔔 Среднее время рассмотрения: <i>30 минут</i>.";
+    
+    /// <summary>
     /// Сообщение, которое отправляется пользователю после успешного анализа и сохранения вечернего отчёта.
     /// Содержит благодарность за проделанную работу и пожелание хорошего отдыха.
     /// </summary>
@@ -156,18 +165,18 @@ public class ManualReportAnalysisCommandHandler(
         // Удаляем сообщение с командой
         await request.TryDeleteMessageAsync(client, ct);
 
-        // Отправляем пользователю сообщение об успешной отправке:
-        // - разный текст для утреннего/вечернего отчёта
-        // - уведомление о просрочке при необходимости
-        await SendSuccessMessageToUserAsync(request, report);
-
         // Если отчёт просрочен, то отправляем его в чаты и отправляем мотивацию и похвалу
         if (report.EveningReport?.Overdue.HasValue ?? report.MorningReport.Overdue.HasValue)
         {
+            // Отправляем пользователю сообщение об успешной отправке:
+            // - разный текст для утреннего/вечернего отчёта
+            // - уведомление о просрочке при необходимости
+            await SendOverdueMessageToUserAsync(request, report);
+            
             // Уведомляем администраторов о новом отчёте:
             // - всем администраторам системы
             // - в рабочий чат пользователя (если указан)
-            await notificationService.NotifyNewReportAsync(report, token: ct);
+            await notificationService.NotifyNewReportAsync(report, token: CancellationToken.None);
 
             // Если анализатор включен, отправляем дополнительные сообщения:
             // - утренняя мотивация и рекомендации
@@ -177,14 +186,23 @@ public class ManualReportAnalysisCommandHandler(
                 request.ReportMessageId,
                 report,
                 request.User,
-                ct
+                CancellationToken.None
             );
         }
         // Иначе уведомляем администраторов о необходимости проверить отчёт
         else
         {
+            // Отправляем сообщение об успешном отправке отчёта на проверку
+            await client.SendMessage(
+                replyParameters: new ReplyParameters { MessageId = request.ReportMessageId },
+                chatId: request.ChatId,
+                text: ReportSubmittedForReviewMessage,
+                parseMode: ParseMode.Html,
+                cancellationToken: CancellationToken.None
+            );
+            
             // Отправляем уведомление о необходимости проверить отчёт
-            await notificationService.NotifyVerifyReportAsync(report, ct);
+            await notificationService.NotifyVerifyReportAsync(report, CancellationToken.None);
         }
     }
 
@@ -373,7 +391,7 @@ public class ManualReportAnalysisCommandHandler(
         else
         {
             // Проверяем просрочку отправки вечернего отчета
-            var overdue = now.MorningReportOverdue();
+            var overdue = now.EveningReportOverdue();
 
             // Добавляем или обновляем вечерний отчет
             report.EveningReport = new UserReport
@@ -407,7 +425,7 @@ public class ManualReportAnalysisCommandHandler(
     /// </summary>
     /// <param name="request">Запрос с данными отчёта.</param>
     /// <param name="report">Объект отчёта.</param>
-    private async Task SendSuccessMessageToUserAsync(ManualReportAnalysisCommand request, Report report)
+    private async Task SendOverdueMessageToUserAsync(ManualReportAnalysisCommand request, Report report)
     {
         if (report.EveningReport == null)
         {

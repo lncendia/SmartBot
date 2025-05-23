@@ -103,7 +103,7 @@ public class AnalyzeReportCommandHandler(
         "Утренние отчёты принимаются с <b>8:00 до 10:00</b> по МСК, " +
         "а вечерние — с <b>17:00 до 20:00</b> по МСК. " +
         "Я отправлю вам уведомление, когда наступит время для отправки отчёта. 🛎";
-    
+
     /// <summary>
     /// Шаблон сообщения о просрочке утреннего отчёта.
     /// </summary>
@@ -373,7 +373,21 @@ public class AnalyzeReportCommandHandler(
     {
         // Проверяем включен ли анализатор в конфигурации системы
         // Если анализатор отключен - пропускаем весь процесс анализа
-        if (!analyzerConfiguration.Enabled) return true;
+        if (!analyzerConfiguration.Enabled)
+        {
+            // В случае любой ошибки при анализе уведомляем пользователя о проблеме
+            await client.SendMessage(
+                replyParameters: new ReplyParameters { MessageId = request.MessageId },
+                chatId: request.ChatId,
+                text: AnalyzerUnavailableMessage,
+                replyMarkup: DefaultKeyboard.RepeatReportAnalysisKeyboard,
+                parseMode: ParseMode.Html,
+                cancellationToken: ct
+            );
+
+            // Возвращаем false как признак неудачного анализа
+            return false;
+        }
 
         // Объявляем переменную для хранения результатов анализа
         ReportAnalysisResult analysisResult;
@@ -462,10 +476,10 @@ public class AnalyzeReportCommandHandler(
 
                     // Проверяем просрочку отправки утреннего отчета
                     Overdue = now.MorningReportOverdue(),
-                    
+
                     // Устанавливаем дату сдачи отчёта
                     Date = now,
-                    
+
                     // Отмечаем, что отчёт принят системой
                     ApprovedBySystem = true
                 }
@@ -485,10 +499,10 @@ public class AnalyzeReportCommandHandler(
 
                 // Проверяем просрочку отправки вечернего отчета
                 Overdue = now.EveningReportOverdue(),
-                
+
                 // Устанавливаем дату сдачи отчёта
                 Date = now,
-                
+
                 // Отмечаем, что отчёт принят системой
                 ApprovedBySystem = true
             };
