@@ -428,7 +428,7 @@ public class AnalyzeReportCommandHandler(
                 replyParameters: new ReplyParameters { MessageId = request.MessageId },
                 chatId: request.ChatId,
                 text: string.Format(ErrorMessage, analysisResult.Score, analysisResult.Recommendations),
-                replyMarkup: DefaultKeyboard.SendForManualAnalysisCallbackData,
+                replyMarkup: DefaultKeyboard.SendReportForManualAnalysisKeyboard,
                 parseMode: ParseMode.Html,
                 cancellationToken: ct
             );

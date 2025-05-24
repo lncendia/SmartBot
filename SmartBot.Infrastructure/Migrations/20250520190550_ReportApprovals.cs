@@ -11,6 +11,8 @@ namespace SmartBot.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DELETE FROM Reports");
+            
             migrationBuilder.DropColumn(
                 name: "EveningReport_Data",
                 table: "Reports");

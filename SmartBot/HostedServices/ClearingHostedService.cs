@@ -83,7 +83,7 @@ public class ClearingHostedService(
 
             // Выполняем SQL-запрос для удаления устаревших отчётов
             var deletedCount = await context.Database.ExecuteSqlRawAsync(
-                "DELETE FROM Reports WHERE Date < {0}", 
+                "DELETE FROM ReportElements WHERE Date < {0}", 
                 maxTime
             );
 
