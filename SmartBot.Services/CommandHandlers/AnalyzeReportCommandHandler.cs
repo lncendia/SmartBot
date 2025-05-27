@@ -215,7 +215,6 @@ public class AnalyzeReportCommandHandler(
             request.ChatId,
             request.MessageId,
             report,
-            request.User,
             ct
         );
     }
@@ -463,7 +462,6 @@ public class AnalyzeReportCommandHandler(
             {
                 // Устанавливаем связь с пользователем
                 UserId = request.User!.Id,
-                User = request.User,
 
                 // Фиксируем текущую дату
                 Date = now,

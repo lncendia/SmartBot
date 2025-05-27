@@ -15,5 +15,5 @@ public class MoscowDateTimeProvider : IDateTimeProvider
     /// <summary>
     /// Возвращает текущее время в часовом поясе МСК (UTC+3).
     /// </summary>
-    public DateTime Now => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, MoscowTimeZone);
+    public DateTime Now => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, MoscowTimeZone).AddHours(-1);
 }

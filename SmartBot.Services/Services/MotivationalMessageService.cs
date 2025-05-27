@@ -45,12 +45,15 @@ public class MotivationalMessageService(
         ChatId chatId,
         int replyMessageId,
         Report report,
-        User user,
         CancellationToken ct)
     {
         // Проверяем включен ли модуль анализатора в конфигурации системы
         if (!analyzerConfiguration.Enabled) return;
 
+        // Проверяем, что отчёт привязан к пользователю
+        if (report.User == null)
+            throw new ArgumentException("Please set the User navigation property in the Report");
+        
         // Определяем тип отчёта по наличию вечернего отчёта
         if (report.EveningReport == null)
         {
@@ -87,7 +90,7 @@ public class MotivationalMessageService(
                 // Обновление рейтинга пользователя
                 await ProcessUserScoreAsync(
                     chatId,
-                    user,
+                    report.User,
                     report.EveningReport.Data,
                     ct);
             }

@@ -362,7 +362,7 @@ public class NotificationService(
     private const string ReportHandSubmissionMessage =
         "📄 <b>Новый отчёт от пользователя</b> <i>{0}</i>\n" +
         "🧑‍🏭 <b>Должность:</b> <i>{1}</i>\n\n" +
-        "🧑‍🏭 <b>Проверил:</b> <i>{2} ({3})</i>\n\n" +
+        "🆗 <b>Проверил:</b> <i>{2} ({3})</i>\n\n" +
         "👇 <b>Текст отчёта:</b>\n" +
         "<blockquote>{4}</blockquote>\n\n" +
         "📝 <i>Нажмите на кнопку, если хотите указать замечания или рекомендации для улучшения.</i>";
@@ -498,17 +498,12 @@ public class NotificationService(
             throw new ArgumentException("Please set the User navigation property in the Report");
 
         // Получаем список ID всех администраторов системы
-        var admins = await unitOfWork
+        var chatsToNotify = await unitOfWork
             .Query<User>()
             .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
             .Select(u => u.Id)
             .ToListAsync(token);
         
-        // Формируем список чатов для уведомлений, исключая автора отчёта
-        var chatsToNotify = admins
-            .Where(a => a != report.User!.Id) // Исключаем автора отчёта из получателей
-            .ToList();
-
         // Определяем тип отчёта (утренний/вечерний)
         var userReport = report.EveningReport ?? report.MorningReport;
 

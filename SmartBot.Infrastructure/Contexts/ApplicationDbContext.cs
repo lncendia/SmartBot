@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Models.Reports;
+using SmartBot.Abstractions.Models.Users;
 using SmartBot.Infrastructure.Configurations;
 
 namespace SmartBot.Infrastructure.Contexts;
@@ -39,6 +40,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // Автозагрузка связанных отчётов
         modelBuilder.Entity<Report>()
             .Navigation(r => r.EveningReport)
+            .AutoInclude();
+        
+        // Автозагрузка связанных чатов
+        modelBuilder.Entity<User>()
+            .Navigation(r => r.WorkingChat)
             .AutoInclude();
         
         // Вызываем базовую реализацию метода

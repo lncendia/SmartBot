@@ -126,7 +126,6 @@ public class UpdateHandler : IUpdateHandler
     {
         // Получаем пользователя из базы данных
         var user = await _unitOfWork.Query<User>()
-            .Include(u => u.WorkingChat)
             .Where(u => u.Role != Role.Blocked)
             .FirstOrDefaultAsync(u => u.Id == callbackQuery.From.Id, cancellationToken: cancellationToken);
 
@@ -155,7 +154,6 @@ public class UpdateHandler : IUpdateHandler
 
         // Если отправитель сообщения известен, получаем пользователя из базы данных
         var user = await _unitOfWork.Query<User>()
-            .Include(u => u.WorkingChat)
             .FirstOrDefaultAsync(u => u.Id == message.From.Id, cancellationToken: cancellationToken);
 
         // Если пользователь заблокирован - не продолжаем

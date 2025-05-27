@@ -2,7 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Extensions;
-using SmartBot.Abstractions.Interfaces.Notification;
 using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Reports;
@@ -98,9 +97,6 @@ public class ReportApprovalHostedService(
             
             // Инициализируем ISender для отправки команд
             var mediator = scope.ServiceProvider.GetRequiredService<ISender>();
-
-            // Получаем сервис уведомлений
-            var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
             // Формируем базовый запрос для получения отчётов
             var query = uow.Query<Report>()

@@ -48,7 +48,7 @@ public class ManualReportAnalysisCommandHandler(
         "Администратор рассмотрит его в ближайшее время.\n\n" +
         "⏳ <b>Ожидайте оповещение о результате проверки.</b>\n" +
         "🔔 Среднее время рассмотрения: <i>30 минут</i>.";
-    
+
     /// <summary>
     /// Сообщение, которое отправляется пользователю после успешного анализа и сохранения вечернего отчёта.
     /// Содержит благодарность за проделанную работу и пожелание хорошего отдыха.
@@ -166,17 +166,17 @@ public class ManualReportAnalysisCommandHandler(
         await request.TryDeleteMessageAsync(client, ct);
 
         // Если отчёт просрочен, то отправляем его в чаты и отправляем мотивацию и похвалу
-        if (report.EveningReport?.Overdue.HasValue ?? report.MorningReport.Overdue.HasValue)
+        if (report.EveningReport?.IsApproved ?? report.MorningReport.IsApproved)
         {
             // Отправляем пользователю сообщение об успешной отправке:
             // - разный текст для утреннего/вечернего отчёта
             // - уведомление о просрочке при необходимости
             await SendOverdueMessageToUserAsync(request, report);
-            
+
             // Уведомляем администраторов о новом отчёте:
             // - всем администраторам системы
             // - в рабочий чат пользователя (если указан)
-            await notificationService.NotifyNewReportAsync(report, token: CancellationToken.None);
+            await notificationService.NotifyNewReportAsync(report, request.User, CancellationToken.None);
 
             // Если анализатор включен, отправляем дополнительные сообщения:
             // - утренняя мотивация и рекомендации
@@ -185,7 +185,6 @@ public class ManualReportAnalysisCommandHandler(
                 request.ChatId,
                 request.ReportMessageId,
                 report,
-                request.User,
                 CancellationToken.None
             );
         }
@@ -200,7 +199,7 @@ public class ManualReportAnalysisCommandHandler(
                 parseMode: ParseMode.Html,
                 cancellationToken: CancellationToken.None
             );
-            
+
             // Отправляем уведомление о необходимости проверить отчёт
             await notificationService.NotifyVerifyReportAsync(report, CancellationToken.None);
         }
@@ -376,9 +375,14 @@ public class ManualReportAnalysisCommandHandler(
                     // Устанавливаем просрочку отправки утреннего отчета
                     Overdue = overdue,
 
-                    // Автоматически считаем принятыми просроченные отчёты
-                    ApprovedBySystem = overdue.HasValue,
-                    
+                    // Автоматически помечаем отчёты как принятые системой, если:
+                    // 1. Отчёт просрочен (overdue.HasValue == true)
+                    // 2. Пользователь НЕ администратор (!request.User.IsAdmin)
+                    ApprovedBySystem = overdue.HasValue && !request.User.IsAdmin,
+
+                    // Помечаем отчёт как принятый администратором, если пользователь имеет права администратора
+                    Approved = request.User.IsAdmin,
+
                     // Устанавливаем дату сдачи отчёта
                     Date = now
                 }
@@ -402,9 +406,14 @@ public class ManualReportAnalysisCommandHandler(
                 // Устанавливаем просрочку отправки вечернего отчета
                 Overdue = overdue,
 
-                // Автоматически считаем принятыми просроченные отчёты
-                ApprovedBySystem = overdue.HasValue,
-                
+                // Автоматически помечаем отчёты как принятые системой, если:
+                // 1. Отчёт просрочен (overdue.HasValue == true)
+                // 2. Пользователь НЕ администратор (!request.User.IsAdmin)
+                ApprovedBySystem = overdue.HasValue && !request.User!.IsAdmin,
+
+                // Помечаем отчёт как принятый администратором, если пользователь имеет права администратора
+                Approved = request.User!.IsAdmin,
+
                 // Устанавливаем дату сдачи отчёта
                 Date = now
             };
@@ -438,12 +447,16 @@ public class ManualReportAnalysisCommandHandler(
                 cancellationToken: CancellationToken.None
             );
 
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: string.Format(MorningOverdueMessage, report.MorningReport.Overdue.FormatTimeSpan()),
-                parseMode: ParseMode.Html,
-                cancellationToken: CancellationToken.None
-            );
+            // Если утренний отчёт просрочен, отправляем уведомление
+            if (report.MorningReport.Overdue.HasValue)
+            {
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: string.Format(MorningOverdueMessage, report.MorningReport.Overdue.FormatTimeSpan()),
+                    parseMode: ParseMode.Html,
+                    cancellationToken: CancellationToken.None
+                );
+            }
 
             // Если сейчас время вечернего отчёта, напоминаем о нём
             if (dateTimeProvider.Now.IsEveningPeriod())
@@ -467,12 +480,16 @@ public class ManualReportAnalysisCommandHandler(
                 cancellationToken: CancellationToken.None
             );
 
-            await client.SendMessage(
-                chatId: request.ChatId,
-                text: string.Format(EveningOverdueMessage, report.EveningReport.Overdue.FormatTimeSpan()),
-                parseMode: ParseMode.Html,
-                cancellationToken: CancellationToken.None
-            );
+            // Если вечерний отчёт просрочен, отправляем уведомление
+            if (report.EveningReport.Overdue.HasValue)
+            {
+                await client.SendMessage(
+                    chatId: request.ChatId,
+                    text: string.Format(EveningOverdueMessage, report.EveningReport.Overdue.FormatTimeSpan()),
+                    parseMode: ParseMode.Html,
+                    cancellationToken: CancellationToken.None
+                );
+            }
         }
     }
 }

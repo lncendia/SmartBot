@@ -73,7 +73,6 @@ public class AutomaticApproveReportCommandHandler(
             request.Report.UserId,
             message.Id,
             request.Report,
-            request.Report.User!,
             ct
         );
     }

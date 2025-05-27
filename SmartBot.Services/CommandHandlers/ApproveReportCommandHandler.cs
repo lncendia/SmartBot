@@ -148,15 +148,18 @@ public class ApproveReportCommandHandler(
         // Отмечаем отчёт принятым
         report.GetReport(request.EveningReport)!.Approved = true;
         
+        // Фиксируем все изменения в базе данных
+        await unitOfWork.SaveChangesAsync(ct);
+        
         // Отправляем сообщение о том, что отчёт не найден
         await client.AnswerCallbackQuery(
             callbackQueryId: request.CallbackQueryId,
             text: ReportSuccessfullyApprovedMessage,
-            cancellationToken: ct
+            cancellationToken: CancellationToken.None
         );
 
         // Удаляем сообщение с командой
-        await request.TryDeleteMessageAsync(client, ct);
+        await request.TryDeleteMessageAsync(client, CancellationToken.None);
 
         // Отправляем пользователю сообщение об успешной отправке:
         // - разный текст для утреннего/вечернего отчёта
@@ -166,17 +169,16 @@ public class ApproveReportCommandHandler(
         // Уведомляем администраторов о новом отчёте:
         // - всем администраторам системы
         // - в рабочий чат пользователя (если указан)
-        await notificationService.NotifyNewReportAsync(report, request.User!, ct);
+        await notificationService.NotifyNewReportAsync(report, request.User!, CancellationToken.None);
 
         // Если анализатор включен, отправляем дополнительные сообщения:
         // - утренняя мотивация и рекомендации
         // - вечерняя оценка и похвала
         await motivationalMessageService.SendMotivationalMessagesAsync(
-            request.ChatId,
+            report.UserId,
             message.Id,
             report,
-            request.User!,
-            ct
+            CancellationToken.None
         );
     }
 
