@@ -161,10 +161,30 @@ public class User
     public double PointsToNextRank => Score switch
     {
         < 20 => 20 - Score,
-        < 50 => 50 - Score,
         >= 4000 => 0,
-        _ => Math.Floor((Score + 50) / 100) * 50 - Score
+        _ => GetDifferenceToNext50(Score)
     };
+
+    /// <summary>
+    /// Вычисляет разницу между переданным числом и ближайшим большим числом, кратным 50.
+    /// </summary>
+    /// <param name="num">Исходное число типа double.</param>
+    /// <returns>
+    /// Возвращает положительную разницу между числом и следующим кратным 50.
+    /// Если число уже кратно 50, возвращает 0.
+    /// </returns>
+    private static double GetDifferenceToNext50(double num)
+    {
+        // Вычисляем остаток от деления числа на 50
+        var remainder = num % 50;
+    
+        // Если остаток равен 0, значит число уже кратно 50 → возвращаем 0
+        if (remainder == 0) 
+            return 0;
+    
+        // Иначе возвращаем разницу между 50 и остатком
+        return 50 - Math.Abs(remainder);
+    }
 
     /// <summary>
     /// Текущее звание пользователя на основе набранных очков.
