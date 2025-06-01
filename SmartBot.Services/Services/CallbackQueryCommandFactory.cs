@@ -78,6 +78,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                     ChatId = query.From.Id,
                     MessageId = query.Message!.Id,
                     TelegramUserId = query.From.Id,
+                    Username = query.From.Username,
                     User = user,
                     CallbackQueryId = query.Id,
                     ReportMessageId = query.Message.ReplyToMessage.MessageId
@@ -93,6 +94,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                     ChatId = query.From.Id,
                     MessageId = query.Message!.Id,
                     TelegramUserId = query.From.Id,
+                    Username = query.From.Username,
                     User = user,
                     CallbackQueryId = query.Id,
                     ReportMessageId = query.Message.ReplyToMessage.MessageId
@@ -152,13 +154,16 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 var data = query.Data.Split('_');
 
                 // Валидация: проверяем, что данные содержат 3 элемента (префикс, reportId, eveningReport)
-                if (data.Length != 3) return null;
+                if (data.Length < 3) return null;
 
                 // Парсим второй элемент данных как Guid (идентификатор отчета)
                 if (!Guid.TryParse(data[1], out var reportId)) return null;
 
                 // Парсим третий элемент данных как boolean (флаг вечернего отчета)
                 if (!bool.TryParse(data[2], out var eveningReport)) return null;
+                
+                // Получаем имя пользователя автора отчёта
+                var reportUsername = data.Length == 4 ? data[3] : null;
 
                 // Создаем и возвращаем команду для начала ввода комментария к отчету
                 return new ApproveReportCommand
@@ -166,10 +171,12 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                     ChatId = query.From.Id,
                     MessageId = query.Message!.Id,
                     TelegramUserId = query.From.Id,
+                    Username = query.From.Username,
                     User = user,
                     ReportId = reportId,
                     CallbackQueryId = query.Id,
-                    EveningReport = eveningReport
+                    EveningReport = eveningReport,
+                    ReportUsername = reportUsername
                 };
             }
 

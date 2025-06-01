@@ -26,4 +26,14 @@ public class ApproveReportCommand : CallbackQueryCommand
     /// false - утренний отчёт
     /// </value>
     public required bool EveningReport { get; init; }
+    
+    /// <summary>
+    /// Имя пользователя Telegram
+    /// </summary>
+    public string? Username { get; init; }
+    
+    /// <summary>
+    /// Имя пользователя автора отчёта Telegram
+    /// </summary>
+    public string? ReportUsername { get; init; }
 }

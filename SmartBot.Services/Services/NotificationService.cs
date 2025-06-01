@@ -5,12 +5,14 @@ using SmartBot.Abstractions.Interfaces.Notification;
 using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Abstractions.Interfaces.Utils;
 using SmartBot.Abstractions.Models.Reports;
-using SmartBot.Abstractions.Models.Users;
+using SmartBot.Abstractions.Models.WorkingChats;
 using SmartBot.Services.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
+using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
+using User = SmartBot.Abstractions.Models.Users.User;
 
 // ReSharper disable InconsistentNaming
 
@@ -104,7 +106,7 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о необходимости сдать утренний отчёт.
     /// </summary>
-    public async Task NotifyMorningReportDueAsync(CancellationToken cancellationToken = default)
+    public async Task NotifyMorningReportDueAsync(CancellationToken cancellationToken)
     {
         // Получаем текущее время.
         var now = dateTimeProvider.Now;
@@ -135,7 +137,7 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о том, что время сдачи утреннего отчёта подходит к концу.
     /// </summary>
-    public async Task NotifyMorningReportDeadlineApproachingAsync(CancellationToken cancellationToken = default)
+    public async Task NotifyMorningReportDeadlineApproachingAsync(CancellationToken cancellationToken)
     {
         // Получаем текущее время.
         var now = dateTimeProvider.Now;
@@ -166,7 +168,7 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о том, что утренний отчёт не был сдан.
     /// </summary>
-    public async Task NotifyMorningReportMissedAsync(CancellationToken cancellationToken = default)
+    public async Task NotifyMorningReportMissedAsync(CancellationToken cancellationToken)
     {
         // Получаем текущее время.
         var now = dateTimeProvider.Now;
@@ -197,7 +199,7 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о необходимости сдать вечерний отчёт.
     /// </summary>
-    public async Task NotifyEveningReportDueAsync(CancellationToken cancellationToken = default)
+    public async Task NotifyEveningReportDueAsync(CancellationToken cancellationToken)
     {
         // Получаем текущее время для проверки отчётов за сегодняшний день.
         var now = dateTimeProvider.Now;
@@ -251,7 +253,7 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о том, что время сдачи вечернего отчёта подходит к концу.
     /// </summary>
-    public async Task NotifyEveningReportDeadlineApproachingAsync(CancellationToken cancellationToken = default)
+    public async Task NotifyEveningReportDeadlineApproachingAsync(CancellationToken cancellationToken)
     {
         // Получаем текущее время для проверки отчётов за сегодняшний день.
         var now = dateTimeProvider.Now;
@@ -305,7 +307,7 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет пользователей о том, что вечерний отчёт не был сдан.
     /// </summary>
-    public async Task NotifyEveningReportMissedAsync(CancellationToken cancellationToken = default)
+    public async Task NotifyEveningReportMissedAsync(CancellationToken cancellationToken)
     {
         // Получаем текущее время для проверки отчётов за сегодняшний день.
         var now = dateTimeProvider.Now;
@@ -353,6 +355,55 @@ public class NotificationService(
         // Отправляем сообщения пользователям, которые не сдали утренний отчёт
         await SendMessagesAsync(usersWithoutMorningReport, EveningReportMissedMessage_MorningMissed,
             cancellationToken: cancellationToken);
+    }
+
+
+    /// <summary>
+    /// Шаблон сообщения о новом пользователе для администраторов.
+    /// Параметры форматирования:
+    /// {0} - Полное имя пользователя (или пустая строка, если недоступно)
+    /// {1} - Должность пользователя
+    /// </summary>
+    private const string NewUserNotificationMessage =
+        "👤 <b>Новый пользователь</b>\n\n" +
+        "📨 <b>Имя:</b> {0}\n" +
+        "💼 <b>Должность:</b> {1}\n\n" +
+        "Выберите рабочий чат для него или проигнорируйте это сообщение.";
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// Отправляет уведомление администраторам о новом пользователе
+    /// </summary>
+    public async Task NotifyNewUserAsync(User user, string? username, CancellationToken token)
+    {
+        // Получаем список рабочих чатов (ID и название) с ограничением в 100 записей
+        var chats = await unitOfWork
+            .Query<WorkingChat>()
+            .Select(c => new ValueTuple<long, string>(c.Id, c.Name))
+            .Take(100)
+            .ToArrayAsync(CancellationToken.None);
+
+        // Если нет доступных чатов, завершаем выполнение
+        if (chats.Length == 0) return;
+
+        // Получаем ID всех администраторов системы (обычных и телеграм-админов)
+        var admins = await unitOfWork
+            .Query<User>()
+            .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
+            .Select(u => u.Id)
+            .ToListAsync(token);
+
+        // Формируем имя пользователя
+        var name = FormatUserName(user, username);
+
+        // Формируем текст уведомления с именем пользователя и должностью
+        var message = string.Format(NewUserNotificationMessage, name, user.Position);
+
+        // Создаем клавиатуру с выбором чатов для нового пользователя
+        var keyboard = AdminKeyboard.SelectWorkingChatKeyboard(chats, user.Id);
+
+        // Рассылаем уведомления всем администраторам
+        await SendMessagesAsync(admins, message, keyboard, token);
     }
 
     /// <summary>
@@ -407,7 +458,12 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет о создании нового отчёта.
     /// </summary>
-    public async Task NotifyNewReportAsync(Report report, User? reviewer = null, CancellationToken token = default)
+    public async Task NotifyNewReportAsync(
+        Report report,
+        string? username,
+        User? reviewer,
+        string? reviewerUsername,
+        CancellationToken token)
     {
         // Проверяем, что отчёт привязан к пользователю
         if (report.User == null)
@@ -439,17 +495,23 @@ public class NotificationService(
 
         string message;
 
+        // Формируем имя пользователя
+        var userName = FormatUserName(report.User, username);
+
         // Формируем сообщение в зависимости от статуса и способа подтверждения отчёта
         if (userReport.Approved)
         {
             // Если отчёт подтверждён вручную администратором
             if (reviewer != null)
             {
+                // Формируем имя администратора
+                var reviewerName = FormatUserName(reviewer, reviewerUsername);
+
                 message = string.Format(
                     ReportHandSubmissionMessage, // Шаблон для ручного подтверждения
-                    report.User.FullName, // 0: Имя пользователя
+                    userName, // 0: Имя пользователя
                     report.User.Position, // 1: Должность
-                    reviewer.FullName, // 2: Имя подтверждающего
+                    reviewerName, // 2: Имя подтверждающего
                     reviewer.Position, // 3: Должность подтверждающего
                     userReport.Data); // 4: Текст отчёта
             }
@@ -458,7 +520,7 @@ public class NotificationService(
                 // Если отчёт подтверждён автоматически анализатором
                 message = string.Format(
                     ReportAnalyzerSubmissionMessage, // Шаблон для автоматического подтверждения
-                    report.User.FullName, // 0: Имя пользователя
+                    userName, // 0: Имя пользователя
                     report.User.Position, // 1: Должность
                     userReport.Data); // 2: Текст отчёта
             }
@@ -468,7 +530,7 @@ public class NotificationService(
             // Если отчёт подтверждён системой (без анализатора)
             message = string.Format(
                 ReportSystemSubmissionMessage, // Шаблон для системного подтверждения
-                report.User.FullName, // 0: Имя пользователя
+                userName, // 0: Имя пользователя
                 report.User.Position, // 1: Должность
                 userReport.Data); // 2: Текст отчёта
         }
@@ -491,7 +553,7 @@ public class NotificationService(
     /// <summary>
     /// Уведомляет о необходимости анализа и проверки отчёта.
     /// </summary>
-    public async Task NotifyVerifyReportAsync(Report report, CancellationToken token = default)
+    public async Task NotifyVerifyReportAsync(Report report, string? username, CancellationToken token)
     {
         // Проверяем, что отчёт привязан к пользователю
         if (report.User == null)
@@ -503,21 +565,22 @@ public class NotificationService(
             .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
             .Select(u => u.Id)
             .ToListAsync(token);
-        
+
         // Определяем тип отчёта (утренний/вечерний)
         var userReport = report.EveningReport ?? report.MorningReport;
 
         // Формируем сообщение с запросом проверки
         var message = string.Format(
             ReportVerificationRequestMessage, // Шаблон запроса проверки
-            report.User.FullName, // 0: Имя пользователя
+            FormatUserName(report.User, username), // 0: Имя пользователя
             report.User.Position, // 1: Должность
             userReport.Data); // 2: Текст отчёта
 
         // Создаём клавиатуру с кнопками подтверждения/отклонения
         var keyboard = AdminKeyboard.VerifyReportKeyboard(
             report.Id,
-            report.EveningReport != null); // Флаг типа отчёта
+            report.EveningReport != null, // Флаг типа отчёта
+            username);
 
         // Отправляем уведомления всем администраторам
         await SendMessagesAsync(chatsToNotify, message, keyboard, token);
@@ -559,8 +622,8 @@ public class NotificationService(
     private async Task SendMessagesAsync(
         IEnumerable<(long chatId, int? threadId)> chats,
         string message,
-        ReplyMarkup? replyMarkup = null,
-        CancellationToken cancellationToken = default)
+        ReplyMarkup? replyMarkup,
+        CancellationToken cancellationToken)
     {
         // Устанавливаем токен отмены операции
         options.CancellationToken = cancellationToken;
@@ -577,7 +640,8 @@ public class NotificationService(
                     text: message, // Текст сообщения.
                     parseMode: ParseMode.Html, // Режим парсинга текста (HTML).
                     replyMarkup: replyMarkup, // Клавиатура сообщения.
-                    cancellationToken: ct // Токен отмены для текущей операции.
+                    cancellationToken: ct, // Токен отмены для текущей операции.
+                    linkPreviewOptions: new LinkPreviewOptions { IsDisabled = true }
                 );
             }
             catch (ApiRequestException ex) // Обработка ошибок, связанных с запросами к Telegram API.
@@ -586,5 +650,22 @@ public class NotificationService(
                 logger.LogWarning(ex, "Failed to send message to chat {ChatId}.", chat.chatId);
             }
         });
+    }
+
+    /// <summary>
+    /// Формирует отображаемое имя пользователя с учетом Telegram username
+    /// </summary>
+    /// <param name="user">Пользователь</param>
+    /// <param name="username">Имя пользователя в Telegram (без @)</param>
+    /// <returns>
+    /// Возвращает:
+    /// - Полное имя пользователя без ссылки, если username не указан
+    /// - Имя с кликабельной ссылкой на Telegram профиль, если username указан
+    /// </returns>
+    private static string FormatUserName(User user, string? username)
+    {
+        return username == null
+            ? user.FullName!
+            : $"<a href=\"https://t.me/{username}\">{user.FullName}</a>";
     }
 }

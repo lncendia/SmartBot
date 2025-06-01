@@ -13,4 +13,9 @@ public class ManualReportAnalysisCommand : CallbackQueryCommand
     /// Идентификатор сообщения с отчётом.
     /// </summary>
     public required int ReportMessageId { get; init; }
+    
+    /// <summary>
+    /// Имя пользователя Telegram
+    /// </summary>
+    public string? Username { get; init; }
 }

@@ -61,7 +61,7 @@ public class ApproveReportCommandHandler(
     /// Сообщение, которое отправляется, если отчёт не найден.
     /// </summary>
     private const string ReportNotFoundMessage = "❌ Отчёт не найден.";
-    
+
     /// <summary>
     /// Сообщение, которое отправляется, если отчёт уже подтвержден и не может быть отклонен.
     /// </summary>
@@ -147,10 +147,10 @@ public class ApproveReportCommandHandler(
 
         // Отмечаем отчёт принятым
         report.GetReport(request.EveningReport)!.Approved = true;
-        
+
         // Фиксируем все изменения в базе данных
         await unitOfWork.SaveChangesAsync(ct);
-        
+
         // Отправляем сообщение о том, что отчёт не найден
         await client.AnswerCallbackQuery(
             callbackQueryId: request.CallbackQueryId,
@@ -169,7 +169,7 @@ public class ApproveReportCommandHandler(
         // Уведомляем администраторов о новом отчёте:
         // - всем администраторам системы
         // - в рабочий чат пользователя (если указан)
-        await notificationService.NotifyNewReportAsync(report, request.User!, CancellationToken.None);
+        await notificationService.NotifyNewReportAsync(report, request.ReportUsername, request.User!, request.Username, CancellationToken.None);
 
         // Если анализатор включен, отправляем дополнительные сообщения:
         // - утренняя мотивация и рекомендации

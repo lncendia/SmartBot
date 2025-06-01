@@ -1,16 +1,11 @@
 ﻿using MediatR;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using SmartBot.Abstractions.Commands;
 using SmartBot.Abstractions.Enums;
 using SmartBot.Abstractions.Extensions;
+using SmartBot.Abstractions.Interfaces.Notification;
 using SmartBot.Abstractions.Interfaces.Storage;
 using SmartBot.Abstractions.Interfaces.Utils;
-using SmartBot.Abstractions.Models.Users;
-using SmartBot.Abstractions.Models.WorkingChats;
-using SmartBot.Services.Keyboards;
 using Telegram.Bot;
-using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
 
 namespace SmartBot.Services.CommandHandlers;
@@ -24,14 +19,12 @@ namespace SmartBot.Services.CommandHandlers;
 /// <param name="client">Клиент для взаимодействия с Telegram API.</param>
 /// <param name="unitOfWork">Контекст работы с данными (Unit of Work).</param>
 /// <param name="dateTimeProvider">Провайдер для работы с текущим временем.</param>
-/// <param name="options">Настройки параллелизма для рассылки сообщений.</param>
-/// <param name="logger">Логгер.</param>
+/// <param name="notificationService">Сервис рассылки уведомлений.</param>
 public class SetPositionCommandHandler(
     ITelegramBotClient client,
     IUnitOfWork unitOfWork,
     IDateTimeProvider dateTimeProvider,
-    ParallelOptions options,
-    ILogger<StartCommandHandler> logger)
+    INotificationService notificationService)
     : IRequestHandler<SetPositionCommand>
 {
     /// <summary>
@@ -73,18 +66,6 @@ public class SetPositionCommandHandler(
         "2. <b>Вечерний отчёт</b> — с 17:00 до 20:00 по МСК.\n\n" +
         "Если у вас есть вопросы или вам нужна помощь, вы всегда можете обратиться к вашему руководителю.\n\n" +
         "<i>Спасибо за понимание! 😊</i>";
-
-    /// <summary>
-    /// Шаблон сообщения о новом пользователе для администраторов.
-    /// Параметры форматирования:
-    /// {0} - Полное имя пользователя (или пустая строка, если недоступно)
-    /// {1} - Должность пользователя
-    /// </summary>
-    private const string NewUserNotificationMessage =
-        "👤 <b>Новый пользователь</b>\n\n" +
-        "📨 <b>Имя:</b> {0}\n" +
-        "💼 <b>Должность:</b> {1}\n\n" +
-        "Выберите рабочий чат для него или проигнорируйте это сообщение.";
 
     /// <summary>
     /// Обрабатывает команду установки должности.
@@ -146,44 +127,9 @@ public class SetPositionCommandHandler(
                 cancellationToken: CancellationToken.None
             );
         }
-
-        // Получаем список всех чатов из базы данных
-        var chats = await unitOfWork
-            .Query<WorkingChat>()
-            .Select(c => new ValueTuple<long, string>(c.Id, c.Name))
-            .Take(100)
-            .ToArrayAsync(CancellationToken.None);
-
-        // Проверяем, есть ли чаты для удаления
-        if (chats.Length == 0) return;
-
-        // Получаем список ID администраторов
-        var admins = await unitOfWork
-            .Query<User>()
-            .Where(u => u.Role == Role.Admin || u.Role == Role.TeleAdmin)
-            .Select(u => u.Id)
-            .ToListAsync(CancellationToken.None);
         
         // Параллельно отправляем уведомления каждому администратору
-        await Parallel.ForEachAsync(admins, options, async (userId, ct) =>
-        {
-            try
-            {
-                // Отправляем сообщение администратору.
-                await client.SendMessage(
-                    chatId: userId,
-                    text: string.Format(NewUserNotificationMessage, request.User?.FullName, request.Position),
-                    parseMode: ParseMode.Html,
-                    replyMarkup: AdminKeyboard.SelectWorkingChatKeyboard(chats, request.TelegramUserId),
-                    cancellationToken: ct
-                );
-            }
-            catch (ApiRequestException ex) // Ловим только ошибки Telegram API
-            {
-                // Логируем ошибку, если не удалось отправить сообщение.
-                logger.LogWarning(ex, "Failed to send new user notification to admin {AdminId}.", userId);
-            }
-        });
+        await notificationService.NotifyNewUserAsync(request.User, request.Username, CancellationToken.None);
     }
 
     /// <summary>

@@ -51,6 +51,7 @@ public class RepeatReportAnalysisCommandHandler(IAsyncSender sender, ITelegramBo
         {
             ChatId = request.ChatId,
             TelegramUserId = request.TelegramUserId,
+            Username = request.Username,
             User = request.User,
             MessageId = request.ReportMessageId,
             Report = request.User.CurrentReport

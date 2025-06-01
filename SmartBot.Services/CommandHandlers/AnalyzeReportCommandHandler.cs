@@ -206,7 +206,7 @@ public class AnalyzeReportCommandHandler(
         // Уведомляем администраторов о новом отчёте:
         // - всем администраторам системы
         // - в рабочий чат пользователя (если указан)
-        await notificationService.NotifyNewReportAsync(report, token: ct);
+        await notificationService.NotifyNewReportAsync(report, request.Username, token: ct);
 
         // Если анализатор включен, отправляем дополнительные сообщения:
         // - утренняя мотивация и рекомендации

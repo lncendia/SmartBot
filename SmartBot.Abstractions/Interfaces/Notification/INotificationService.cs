@@ -62,22 +62,38 @@ public interface INotificationService
     /// Уведомляет о создании нового отчёта.
     /// </summary>
     /// <param name="report">Объект отчёта, содержащий данные для проверки</param>
+    /// <param name="username">Имя пользователя (опционально)</param>
     /// <param name="reviewer">Администратор, который проверил отчёт. 
     /// Если null - отчёт проверен автоматически.</param>
+    /// <param name="reviewerUsername">Имя пользователя проверяющего (опционально)</param>
     /// <param name="token">Токен отмены для асинхронной операции</param>
     /// <remarks>
     /// Используется для оповещения администраторов о новых отчётах.
     /// </remarks>
-    Task NotifyNewReportAsync(Report report, User? reviewer = null, CancellationToken token = default);
+    Task NotifyNewReportAsync(
+        Report report,
+        string? username = null,
+        User? reviewer = null,
+        string? reviewerUsername = null,
+        CancellationToken token = default);
 
     /// <summary>
     /// Уведомляет о необходимости анализа и проверки отчёта.
     /// </summary>
     /// <param name="report">Объект отчёта, требующий проверки</param>
+    /// <param name="username">Имя пользователя (опционально)</param>
     /// <param name="token">Токен отмены для асинхронной операции</param>
     /// <remarks>
     /// Отправляется администраторам для ручной проверки отчётов,
     /// которые не могут быть автоматически обработаны системой.
     /// </remarks>
-    Task NotifyVerifyReportAsync(Report report, CancellationToken token = default);
+    Task NotifyVerifyReportAsync(Report report, string? username = null, CancellationToken token = default);
+
+    /// <summary>
+    /// Отправляет уведомление администраторам о новом пользователе
+    /// </summary>
+    /// <param name="user">Данные нового пользователя</param>
+    /// <param name="username">Имя пользователя (опционально)</param>
+    /// <param name="token">Токен отмены операции</param>
+    Task NotifyNewUserAsync(User user, string? username, CancellationToken token = default);
 }

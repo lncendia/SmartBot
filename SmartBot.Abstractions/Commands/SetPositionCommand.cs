@@ -11,4 +11,9 @@ public class SetPositionCommand : TelegramCommand
     /// Должность пользователя
     /// </summary>
     public string? Position { get; init; }
+    
+    /// <summary>
+    /// Имя пользователя Telegram
+    /// </summary>
+    public string? Username { get; init; }
 }

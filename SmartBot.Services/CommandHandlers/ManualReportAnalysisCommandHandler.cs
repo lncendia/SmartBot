@@ -171,12 +171,12 @@ public class ManualReportAnalysisCommandHandler(
             // Отправляем пользователю сообщение об успешной отправке:
             // - разный текст для утреннего/вечернего отчёта
             // - уведомление о просрочке при необходимости
-            await SendOverdueMessageToUserAsync(request, report);
+            await SendMessageToUserAsync(request, report);
 
             // Уведомляем администраторов о новом отчёте:
             // - всем администраторам системы
             // - в рабочий чат пользователя (если указан)
-            await notificationService.NotifyNewReportAsync(report, request.User, CancellationToken.None);
+            await notificationService.NotifyNewReportAsync(report, request.Username, request.User, request.Username, token: CancellationToken.None);
 
             // Если анализатор включен, отправляем дополнительные сообщения:
             // - утренняя мотивация и рекомендации
@@ -201,7 +201,7 @@ public class ManualReportAnalysisCommandHandler(
             );
 
             // Отправляем уведомление о необходимости проверить отчёт
-            await notificationService.NotifyVerifyReportAsync(report, CancellationToken.None);
+            await notificationService.NotifyVerifyReportAsync(report, request.Username, CancellationToken.None);
         }
     }
 
@@ -434,7 +434,7 @@ public class ManualReportAnalysisCommandHandler(
     /// </summary>
     /// <param name="request">Запрос с данными отчёта.</param>
     /// <param name="report">Объект отчёта.</param>
-    private async Task SendOverdueMessageToUserAsync(ManualReportAnalysisCommand request, Report report)
+    private async Task SendMessageToUserAsync(ManualReportAnalysisCommand request, Report report)
     {
         if (report.EveningReport == null)
         {

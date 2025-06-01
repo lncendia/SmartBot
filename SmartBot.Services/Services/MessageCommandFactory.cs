@@ -90,6 +90,7 @@ public class MessageCommandFactory : IMessageCommandFactory
             {
                 ChatId = message.Chat,
                 TelegramUserId = message.From!.Id,
+                Username = message.From.Username,
                 User = user,
                 Position = message.Text
             };
@@ -103,6 +104,7 @@ public class MessageCommandFactory : IMessageCommandFactory
             {
                 ChatId = message.Chat,
                 TelegramUserId = message.From!.Id,
+                Username = message.From.Username,
                 User = user,
                 MessageId = message.Id,
                 Report = message.Text

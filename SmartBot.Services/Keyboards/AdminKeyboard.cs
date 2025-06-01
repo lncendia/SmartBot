@@ -11,7 +11,7 @@ public static class AdminKeyboard
     /// Префикс для callback-данных кнопки "Оставить комментарий".
     /// </summary>
     public const string CommentReportCallbackData = "comment_";
-    
+
     /// <summary>
     /// Префикс для callback-данных кнопки подтверждения отчёта.
     /// Формат: "approve_[reportId]_[isEveningReport]"
@@ -147,22 +147,27 @@ public static class AdminKeyboard
         // Возвращаем клавиатуру с одной кнопкой
         return new InlineKeyboardMarkup(button);
     }
-    
+
     /// <summary>
     /// Создаёт интерактивную клавиатуру для администраторов с действиями по отчёту
     /// </summary>
     /// <param name="reportId">Идентификатор отчёта для привязки действий</param>
     /// <param name="isEveningReport">Флаг, указывающий на тип отчёта (true - вечерний, false - утренний)</param>
+    /// <param name="username">Имя пользователя (опционально)</param>
     /// <returns>Клавиатура с кнопками подтверждения и отклонения отчёта</returns>
-    public static InlineKeyboardMarkup VerifyReportKeyboard(Guid reportId, bool isEveningReport)
+    public static InlineKeyboardMarkup VerifyReportKeyboard(Guid reportId, bool isEveningReport, string? username)
     {
+        var usernameSection = username != null
+            ? $"_{username}"
+            : string.Empty;
+
         var keyboard = new List<List<InlineKeyboardButton>>
         {
             new()
             {
                 InlineKeyboardButton.WithCallbackData(
                     text: "✅ Подтвердить",
-                    callbackData: $"{ApproveReportCallbackData}{reportId}_{isEveningReport}"
+                    callbackData: $"{ApproveReportCallbackData}{reportId}_{isEveningReport}{usernameSection}"
                 )
             },
             new()
@@ -173,7 +178,7 @@ public static class AdminKeyboard
                 )
             }
         };
-        
+
         // Возвращаем клавиатуру
         return new InlineKeyboardMarkup(keyboard);
     }
