@@ -11,5 +11,5 @@ public interface IDataExporter
     /// <param name="reports">Список отчетов для экспорта</param>
     /// <param name="cancellationToken">Токен отмены операции</param>
     /// <returns>Задача, представляющая асинхронную операцию экспорта</returns>
-    Task ExportReportsAsync(IReadOnlyList<ReportData> reports, CancellationToken cancellationToken = default);
+    Task ExportReportsAsync(IEnumerable<ReportData> reports, CancellationToken cancellationToken = default);
 }

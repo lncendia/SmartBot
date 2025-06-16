@@ -63,7 +63,7 @@ public class GoogleSheetsExporter : IDataExporter
     /// <summary>
     /// Экспортирует массив отчетов в Google Таблицу.
     /// </summary>
-    public async Task ExportReportsAsync(IReadOnlyList<ReportData> reports, CancellationToken token)
+    public async Task ExportReportsAsync(IEnumerable<ReportData> reports, CancellationToken token)
     {
         // Получаем данные о таблицах из Google Sheets
         var sheets = await _sheetsService.Spreadsheets.Get(_configuration.SpreadsheetId).ExecuteAsync(token);
@@ -91,27 +91,27 @@ public class GoogleSheetsExporter : IDataExporter
             // Утренний отчёт
             report.MorningReport?.Data ?? string.Empty,
 
-            // Просрочка утреннего отчёта
-            report.MorningReport?.Overdue.FormatTimeSpan() ?? string.Empty,
+            // Время сдачи отчёта
+            GetReportElementTime(report.MorningReport),
 
-            //
+            // Способ проверки отчёта
             report.MorningReport == null
-                ? string.Empty 
-                : report.MorningReport.Approved 
-                    ? "Администратором" 
+                ? string.Empty
+                : report.MorningReport.Approved
+                    ? "Администратором"
                     : "Автоматически",
 
             // Вечерний отчёт
             report.EveningReport?.Data ?? string.Empty,
 
-            // Просрочка утреннего отчёта
-            report.EveningReport?.Overdue.FormatTimeSpan() ?? string.Empty,
+            // Время сдачи отчёта
+            GetReportElementTime(report.EveningReport),
 
-            //
+            // Способ проверки отчёта
             report.EveningReport == null
-                ? string.Empty 
-                : report.EveningReport.Approved 
-                    ? "Администратором" 
+                ? string.Empty
+                : report.EveningReport.Approved
+                    ? "Администратором"
                     : "Автоматически",
 
             // Дата отчёта
@@ -129,10 +129,10 @@ public class GoogleSheetsExporter : IDataExporter
                 "Имя",
                 "Должность",
                 "Утренний отчёт",
-                "Просрочен на",
+                "Время сдачи",
                 "Проверен",
                 "Вечерний отчёт",
-                "Просрочен на",
+                "Время сдачи",
                 "Проверен",
                 "Дата",
                 "Комментарий"
@@ -163,7 +163,7 @@ public class GoogleSheetsExporter : IDataExporter
             response.Updates?.UpdatedRows ?? 0);
 
         // Применяем форматирование для добавленных ячеек
-        await ApplyFormatingAsync(lastRow, reports.Count, token);
+        await ApplyFormatingAsync(lastRow, values.Count - (lastRow == 0 ? 1 : 0), token);
 
         // Логируем результат форматирования
         _logger.LogInformation("Formatting applied successfully.");
@@ -460,110 +460,22 @@ public class GoogleSheetsExporter : IDataExporter
         // Добавляем запрос форматирования данных в список запросов.
         requests.Add(dataFormatRequest);
 
-        // Создаем запрос для установки переноса текста в колонке с индексом 2.
-        var wrapTextRequestColumn2 = new Request
+        // Создаем запрос для установки переноса текста в колонке с индексом 1 - 10.
+        var wrapTextRequestColumn = new Request
         {
             // Указываем параметры для обновления ячеек.
             RepeatCell = new RepeatCellRequest
             {
-                // Указываем диапазон колонок (2, 4 и 7).
+                // Указываем диапазон колонок (1 - 10).
                 Range = new GridRange
                 {
                     // ID листа, на котором будут применяться изменения.
                     SheetId = _configuration.SheetId,
 
-                    // Начальная колонка (индекс 2).
-                    StartColumnIndex = 2,
+                    // Начальная колонка (индекс 1).
+                    StartColumnIndex = 1,
 
                     // Конечная колонка (индекс 3, не включая).
-                    EndColumnIndex = 3,
-
-                    // Начальная строка (индекс 1, пропускаем заголовок).
-                    StartRowIndex = 1,
-
-                    // Конечная строка (последняя строка с данными).
-                    EndRowIndex = lastRow + reportsCount
-                },
-
-                // Устанавливаем свойства ячеек.
-                Cell = new CellData
-                {
-                    // Формат ячейки, который будет применён.
-                    UserEnteredFormat = new CellFormat
-                    {
-                        // Включаем перенос текста в ячейках.
-                        WrapStrategy = "WRAP"
-                    }
-                },
-
-                // Указываем, что нужно обновить только свойство WrapStrategy.
-                Fields = "userEnteredFormat.wrapStrategy"
-            }
-        };
-
-        // Добавляем запрос форматирования данных в список запросов.
-        requests.Add(wrapTextRequestColumn2);
-
-        // Создаем запрос для установки переноса текста в колонке с индексом 5.
-        var wrapTextRequestColumn5 = new Request
-        {
-            // Указываем параметры для обновления ячеек.
-            RepeatCell = new RepeatCellRequest
-            {
-                // Указываем диапазон колонок (5).
-                Range = new GridRange
-                {
-                    // ID листа, на котором будут применяться изменения.
-                    SheetId = _configuration.SheetId,
-
-                    // Начальная колонка (индекс 5).
-                    StartColumnIndex = 5,
-
-                    // Конечная колонка (индекс 6, не включая).
-                    EndColumnIndex = 6,
-
-                    // Начальная строка (индекс 1, пропускаем заголовок).
-                    StartRowIndex = 1,
-
-                    // Конечная строка (последняя строка с данными).
-                    EndRowIndex = lastRow + reportsCount
-                },
-
-                // Устанавливаем свойства ячеек.
-                Cell = new CellData
-                {
-                    // Формат ячейки, который будет применён.
-                    UserEnteredFormat = new CellFormat
-                    {
-                        // Включаем перенос текста в ячейках.
-                        WrapStrategy = "WRAP"
-                    }
-                },
-
-                // Указываем, что нужно обновить только свойство WrapStrategy.
-                Fields = "userEnteredFormat.wrapStrategy"
-            }
-        };
-
-        // Добавляем запрос форматирования данных в список запросов.
-        requests.Add(wrapTextRequestColumn5);
-
-        // Создаем запрос для установки переноса текста в колонке с индексом 9.
-        var wrapTextRequestColumn9 = new Request
-        {
-            // Указываем параметры для обновления ячеек.
-            RepeatCell = new RepeatCellRequest
-            {
-                // Указываем диапазон колонок (9).
-                Range = new GridRange
-                {
-                    // ID листа, на котором будут применяться изменения.
-                    SheetId = _configuration.SheetId,
-
-                    // Начальная колонка (индекс 9).
-                    StartColumnIndex = 9,
-
-                    // Конечная колонка (индекс 10, не включая).
                     EndColumnIndex = 10,
 
                     // Начальная строка (индекс 1, пропускаем заголовок).
@@ -590,7 +502,7 @@ public class GoogleSheetsExporter : IDataExporter
         };
 
         // Добавляем запрос форматирования данных в список запросов.
-        requests.Add(wrapTextRequestColumn9);
+        requests.Add(wrapTextRequestColumn);
 
         // Создаем запрос для установки высоты строк данных.
         var dataRowHeightRequest = new Request
@@ -639,5 +551,32 @@ public class GoogleSheetsExporter : IDataExporter
         // Выполняем запрос на форматирование
         await _sheetsService.Spreadsheets.BatchUpdate(batchUpdateRequest, _configuration.SpreadsheetId)
             .ExecuteAsync(token);
+    }
+
+    /// <summary>
+    /// Форматирует время отчёта и информацию о просрочке (если есть) в читаемый строковый формат
+    /// </summary>
+    /// <param name="element">Элемент отчёта (может быть null)</param>
+    /// <returns>
+    /// Строка в формате "HH:mm:ss", дополненная информацией о просрочке, если она есть.
+    /// Возвращает пустую строку, если элемент отчёта отсутствует.
+    /// </returns>
+    private static string GetReportElementTime(ReportElement? element)
+    {
+        // Если элемент отчёта не передан - возвращаем пустую строку
+        if (element == null) return string.Empty;
+
+        // Форматируем время элемента в стандартный часовой формат
+        var formatedText = new DateTime(element.TimeOfDay.Ticks).ToString("HH:mm:ss");
+
+        // Если есть информация о просрочке - добавляем её к результату
+        if (element.Overdue.HasValue)
+        {
+            // Добавляем информацию о просрочке с переводом строки
+            // FormatTimeSpan() преобразует TimeSpan в читаемый формат (например "2 дня 5 часов")
+            formatedText = formatedText + "\nПросрочен на " + element.Overdue.FormatTimeSpan();
+        }
+
+        return formatedText;
     }
 }

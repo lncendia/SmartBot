@@ -164,38 +164,43 @@ public class ExportingHostedService(
                         Position = userGroup.User.Position,
 
                         // Дата отчёта (если отчёт есть, иначе текущая дата)
-                        Date = report != null ? report.Date.Date : dateTimeProvider.Now.Date.AddDays(-1),
+                        Date = report != null ? report.Date : dateTimeProvider.Now.AddDays(-1),
 
-                        // Утренний отчёт
+                        // Утренний отчёт (может быть null, если отчёт отсутствует)
                         MorningReport = report == null
                             ? null
                             : new ReportElement
                             {
-                                //
+                                // Текст отчёта
                                 Data = report.MorningReport.Data,
 
-                                //
+                                // Просрочка отчёта
                                 Overdue = report.MorningReport.Overdue,
+                                
+                                // Время сдачи отчёта
+                                TimeOfDay = report.MorningReport.Date.TimeOfDay,
 
-                                //
+                                // Флаг, указывающий, был ли отчёт подтверждён
                                 Approved = report.MorningReport.Approved
                             },
 
-                        // Вечерний отчёт
+                        // Вечерний отчёт (может быть null, если отчёт отсутствует или не заполнен)
                         EveningReport = report == null || report.EveningReport == null
                             ? null
                             : new ReportElement
                             {
-                                //
+                                // Текст отчёта
                                 Data = report.EveningReport.Data,
 
-                                //
+                                // Просрочка отчёта
                                 Overdue = report.EveningReport.Overdue,
+                                
+                                // Время сдачи отчёта
+                                TimeOfDay = report.EveningReport.Date.TimeOfDay,
 
-                                //
+                                // Флаг, указывающий, был ли вечерний отчёт подтверждён
                                 Approved = report.EveningReport.Approved
                             },
-
                         // Комментарий к отчёту
                         Comment = report != null ? report.Comment : null,
 
@@ -204,17 +209,14 @@ public class ExportingHostedService(
                     }
                 )
 
-                // Сортируем отчёты по дате в порядке убывания
-                .OrderBy(r => r.Date)
-
                 // Получаем список отчётов
                 .ToListAsync();
 
             // Экспортируем отчёты с помощью сервиса экспорта
-            await exporter.ExportReportsAsync(reports);
+            await exporter.ExportReportsAsync(reports.OrderBy(r => r.Date.Date).ThenBy(r => r.Name));
 
             // Получаем идентификатор последнего существующего экспортированного отчёта
-            var lastId = reports.FirstOrDefault(r => r.Id.HasValue)?.Id;
+            var lastId = reports.OrderByDescending(r => r.Date).FirstOrDefault(r => r.Id.HasValue)?.Id;
 
             // Если существующий (а не пустой) отчёт найден
             if (lastId.HasValue)

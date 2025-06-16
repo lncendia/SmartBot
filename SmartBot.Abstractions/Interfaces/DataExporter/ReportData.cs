@@ -56,6 +56,11 @@ public class ReportElement
     /// Если отчёт сдан вовремя, значение равно null.
     /// </summary>
     public TimeSpan? Overdue { get; init; }
+    
+    /// <summary>
+    /// Время сдачи отчёта. 
+    /// </summary>
+    public required TimeSpan TimeOfDay { get; init; }
 
     /// <summary>
     /// Флаг, указывающий был ли отчёт одобрен администратором.
