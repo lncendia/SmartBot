@@ -27,13 +27,13 @@ public class UserSynchronizationService : IUserSynchronizationService, IDisposab
         {
             // Ждем, пока семафор освободится
             await semaphore.WaitAsync(cancellationToken);
-
-            // Не продолжаем выполнение, если семафор уже существует
-            return;
         }
         
         // Создаём новый семафор для данного пользователя
         _userSemaphores[userId] = new SemaphoreSlim(1, 1);
+        
+        // Захватываем созданный семафор
+        await _userSemaphores[userId].WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -44,11 +44,13 @@ public class UserSynchronizationService : IUserSynchronizationService, IDisposab
     public void Release(long userId)
     {
         // Проверяем, существует ли семафор для данного пользователя
-        if (_userSemaphores.TryRemove(userId, out var semaphore))
-        {
-            // Освобождаем ресурсы семафора
-            semaphore.Dispose();
-        }
+        if (!_userSemaphores.TryRemove(userId, out var semaphore)) return;
+        
+        // Освобождаем семафор
+        semaphore.Release();
+            
+        // Освобождаем ресурсы семафора
+        semaphore.Dispose();
     }
 
     /// <summary>

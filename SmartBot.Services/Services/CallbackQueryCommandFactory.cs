@@ -161,7 +161,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
 
                 // Парсим третий элемент данных как boolean (флаг вечернего отчета)
                 if (!bool.TryParse(data[2], out var eveningReport)) return null;
-                
+
                 // Получаем имя пользователя автора отчёта
                 var reportUsername = data.Length == 4 ? data[3] : null;
 
@@ -237,6 +237,9 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
             {
                 // Получаем данные из команды
                 var data = query.Data.Split('_');
+                
+                // Валидация: проверяем, что данные содержат 3 элемента (префикс, reportId, eveningReport)
+                if (data.Length != 3) return null;
 
                 // Если число данных удовлетворяет параметрам команды StartSelectUserForWorkingChatCommand
                 if (data.Length == 3)
@@ -281,25 +284,7 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 // Если число данных не удовлетворяет параметрам команд, возвращаем null
                 return null;
             }
-
-            // Если данные начинаются с префикса SelectAdminCallbackData
-            if (query.Data.StartsWith(AdminKeyboard.SelectAdminCallbackData))
-            {
-                // Получаем флаг необходимости добавления администратора как теле-администратора
-                var teleAdmin = query.Data == AdminKeyboard.SelectTeleAdminCallbackData;
-
-                // Если данные соответствуют SelectAdminCallbackData, возвращаем команду для добавления администратора
-                return new StartSelectUserForAssignAdminCommand
-                {
-                    ChatId = query.From.Id,
-                    TelegramUserId = query.From.Id,
-                    User = user,
-                    CallbackQueryId = query.Id,
-                    MessageId = query.Message!.Id,
-                    TeleAdmin = teleAdmin
-                };
-            }
-
+            
             // Если запрошена команда AddWorkingChatCallbackData
             if (query.Data == AdminKeyboard.AddWorkingChatCallbackData)
             {
@@ -328,45 +313,24 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                 };
             }
 
-            // Если запрошена команда AssignAdminCallbackData
-            if (query.Data == AdminKeyboard.AssignAdminCallbackData)
+            // Если запрошена команда EditUserCallbackData
+            if (query.Data.StartsWith(AdminKeyboard.EditUserCallbackData))
             {
-                // Если данные соответствуют AssignAdminCallbackData, возвращаем команду для добавления рабочего чата
-                return new StartAssignAdminCommand
-                {
-                    ChatId = query.From.Id,
-                    TelegramUserId = query.From.Id,
-                    User = user,
-                    CallbackQueryId = query.Id,
-                    MessageId = query.Message!.Id
-                };
-            }
-
-            // Если запрошена команда DemoteAdminCallbackData
-            if (query.Data == AdminKeyboard.DemoteAdminCallbackData)
-            {
-                // Если данные соответствуют DemoteAdminCallbackData, возвращаем команду для добавления рабочего чата
-                return new StartDemoteAdminCommand
-                {
-                    ChatId = query.From.Id,
-                    TelegramUserId = query.From.Id,
-                    User = user,
-                    CallbackQueryId = query.Id,
-                    MessageId = query.Message!.Id
-                };
-            }
-
-            // Если запрошена команда BlockUserCallbackData
-            if (query.Data == AdminKeyboard.BlockUserCallbackData)
-            {
+                // Извлекаем команду из данных callback-запроса
+                var range = new Range(
+                    new Index(AdminKeyboard.EditUserCallbackData.Length),
+                    new Index(query.Data.Length)
+                );
+                
                 // Если данные соответствуют BlockUserCallbackData, возвращаем команду для добавления рабочего чата
-                return new StartBlockUserCommand
+                return new StartSelectUserForEditCommand
                 {
                     ChatId = query.From.Id,
                     TelegramUserId = query.From.Id,
                     User = user,
                     CallbackQueryId = query.Id,
-                    MessageId = query.Message!.Id
+                    MessageId = query.Message!.Id,
+                    Command = query.Data[range]
                 };
             }
 
@@ -383,13 +347,28 @@ public class CallbackQueryCommandFactory : ICallbackQueryCommandFactory
                     MessageId = query.Message!.Id
                 };
             }
+            
+            // Если запрошена команда ChangeUserCallbackData
+            if (query.Data == AdminKeyboard.ChangeUserCallbackData)
+            {
+                // Если данные соответствуют ChangeUserCallbackData, возвращаем команду для добавления рабочего чата
+                return new StartEditUserCommand
+                {
+                    ChatId = query.From.Id,
+                    TelegramUserId = query.From.Id,
+                    User = user,
+                    CallbackQueryId = query.Id,
+                    MessageId = query.Message!.Id
+                };
+            }
         }
 
         // Обработка команды "Назад" для административных состояний
         if (user.State is State.AwaitingAdminIdForAdding or State.AwaitingTeleAdminIdForAdding
-                or State.AwaitingAdminIdForRemoval or State.AwaitingUserIdForBlock
+                or State.AwaitingAdminIdForRemoval or State.AwaitingUserIdForBlocking
                 or State.AwaitingWorkingChatIdForAdding or State.Idle
-                or State.AwaitingUserIdForSetWorkingChat
+                or State.AwaitingUserIdForSetWorkingChat or State.AwaitingUserIdForEditName
+                or State.AwaitingUserIdForEditPosition or State.AwaitingNameForEdit or State.AwaitingPositionForEdit
             && query.Data == AdminKeyboard.GoBackCallbackData)
         {
             // Создаем команду возврата в предыдущее меню

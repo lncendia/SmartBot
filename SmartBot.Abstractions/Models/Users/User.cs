@@ -118,6 +118,15 @@ public class User
     public long? SelectedWorkingChatId { get; set; }
 
     /// <summary>
+    /// Временный идентификатор пользователя для изменения (администраторский функционал)
+    /// </summary>
+    /// <value>
+    /// ID пользователя, выбранного администратором для изменения.
+    /// Используется в процессе настройки рабочего пространства.
+    /// </value>
+    public long? SelectedUserId { get; set; }
+    
+    /// <summary>
     /// Контекст ответа на сообщение
     /// </summary>
     /// <value>

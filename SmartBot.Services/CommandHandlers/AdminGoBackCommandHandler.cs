@@ -46,7 +46,10 @@ public class AdminGoBackCommandHandler(ITelegramBotClient client, IUnitOfWork un
         
         // Сбрасываем ID проверяемого чата
         request.User.SelectedWorkingChatId = null;
-
+              
+        // Сбрасываем ID изменяемого пользователя
+        request.User.SelectedUserId = null;
+        
         // Сохраняем изменения в базе данных
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

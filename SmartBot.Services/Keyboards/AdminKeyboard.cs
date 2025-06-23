@@ -40,15 +40,10 @@ public static class AdminKeyboard
     public const string SelectChatCallbackData = "select_chat_";
 
     /// <summary>
-    /// Callback-данные для команды назначения администратора.
+    /// Callback-данные для команды изменения пользователя.
     /// </summary>
-    public const string AssignAdminCallbackData = "assign_admin";
-
-    /// <summary>
-    /// Callback-данные для команды разжалования администратора.
-    /// </summary>
-    public const string DemoteAdminCallbackData = "demote_admin";
-
+    public const string ChangeUserCallbackData = "change_user";
+    
     /// <summary>
     /// Callback-данные для команды добавления рабочего чата.
     /// </summary>
@@ -60,11 +55,6 @@ public static class AdminKeyboard
     public const string RemoveWorkingChatCallbackData = "remove_working_chat";
 
     /// <summary>
-    /// Callback-данные для команды блокировки пользователя.
-    /// </summary>
-    public const string BlockUserCallbackData = "block_user";
-
-    /// <summary>
     /// Callback-данные для команды установки рабочего чата пользователю.
     /// </summary>
     public const string SetWorkingChatCallbackData = "set_working_chat";
@@ -72,12 +62,70 @@ public static class AdminKeyboard
     /// <summary>
     /// Callback-данные для выбора обычного администратора.
     /// </summary>
-    public const string SelectAdminCallbackData = "select_admin";
+    public const string AssignAdminPart = "assign-admin";
 
     /// <summary>
     /// Callback-данные для выбора теле-администратора.
     /// </summary>
-    public const string SelectTeleAdminCallbackData = $"{SelectAdminCallbackData}_tele";
+    public const string AssignTeleAdminPart = "assign-teleadmin";
+    
+    /// <summary>
+    /// Callback-данные для выбора обычного администратора.
+    /// </summary>
+    public const string DemoteAdminPart = "demote-admin";
+    
+    /// <summary>
+    /// Часть callback-данных, идентифицирующая изменение имени пользователя.
+    /// Используется для формирования полных callback-данных.
+    /// </summary>
+    public const string EditUserNamePart = "name";
+
+    /// <summary>
+    /// Часть callback-данных, идентифицирующая изменение должности пользователя.
+    /// Используется для формирования полных callback-данных.
+    /// </summary>
+    public const string EditUserPositionPart = "position";
+    
+    /// <summary>
+    /// Часть callback-данных, идентифицирующая изменение должности пользователя.
+    /// Используется для формирования полных callback-данных.
+    /// </summary>
+    public const string BlockUserPositionPart = "block";
+
+    /// <summary>
+    /// Callback-данные для команды изменения пользователя.
+    /// </summary>
+    public const string EditUserCallbackData = "edit_user_";
+    
+    /// <summary>
+    /// Полные callback-данные для выбора операции изменения имени пользователя.
+    /// </summary>
+    private const string EditUserNameCallbackData = $"{EditUserCallbackData}{EditUserNamePart}";
+
+    /// <summary>
+    /// Полные callback-данные для выбора операции изменения должности пользователя.
+    /// </summary>
+    private const string EditUserPositionCallbackData = $"{EditUserCallbackData}{EditUserPositionPart}";
+    
+    /// <summary>
+    /// Callback-данные для команды назначения администратора.
+    /// </summary>
+    private const string AssignAdminCallbackData = $"{EditUserCallbackData}{AssignAdminPart}";
+    
+    /// <summary>
+    /// Callback-данные для команды назначения администратора.
+    /// </summary>
+    private const string AssignTeleAdminCallbackData = $"{EditUserCallbackData}{AssignTeleAdminPart}";
+
+    /// <summary>
+    /// Callback-данные для команды разжалования администратора.
+    /// </summary>
+    private const string DemoteAdminCallbackData = $"{EditUserCallbackData}{DemoteAdminPart}";
+    
+    /// <summary>
+    /// Callback-данные для команды разжалования администратора.
+    /// </summary>
+    private const string BlockUserCallbackData = $"{EditUserCallbackData}{BlockUserPositionPart}";
 
     /// <summary>
     /// Основная клавиатура администратора с действиями.
@@ -88,15 +136,8 @@ public static class AdminKeyboard
             new()
             {
                 InlineKeyboardButton.WithCallbackData(
-                    text: "👑 Назначить администратора",
-                    callbackData: AssignAdminCallbackData
-                )
-            },
-            new()
-            {
-                InlineKeyboardButton.WithCallbackData(
-                    text: "👨‍⚖️ Разжаловать администратора",
-                    callbackData: DemoteAdminCallbackData
+                    text: "✏️ Изменить пользователя",
+                    callbackData: ChangeUserCallbackData
                 )
             },
             new()
@@ -118,13 +159,6 @@ public static class AdminKeyboard
                 InlineKeyboardButton.WithCallbackData(
                     text: "💬 Назначить рабочий чат",
                     callbackData: SetWorkingChatCallbackData
-                )
-            },
-            new()
-            {
-                InlineKeyboardButton.WithCallbackData(
-                    text: "⛔ Заблокировать пользователя",
-                    callbackData: BlockUserCallbackData
                 )
             }
         }
@@ -192,26 +226,54 @@ public static class AdminKeyboard
             callbackData: GoBackCallbackData
         )
     );
-
+    
     /// <summary>
-    /// Клавиатура с кнопкой "Назад".
+    /// Клавиатура для выбора типа изменяемых данных пользователя.
     /// </summary>
-    public static InlineKeyboardMarkup SelectAdminTypeKeyboard { get; } = new(
+    public static InlineKeyboardMarkup EditUserTypeKeyboard { get; } = new(
         new List<List<InlineKeyboardButton>>
         {
             new()
             {
                 InlineKeyboardButton.WithCallbackData(
-                    text: "👨‍💼 Администратор",
-                    callbackData: SelectAdminCallbackData
+                    text: "👨‍💼 Назначить администратором",
+                    callbackData: AssignAdminCallbackData
                 ),
             },
             new()
             {
                 InlineKeyboardButton.WithCallbackData(
-                    text: "👨‍💻 Теле-администратор",
-                    callbackData: SelectTeleAdminCallbackData
+                    text: "👨‍💻 Назначить теле-администратором",
+                    callbackData: AssignTeleAdminCallbackData
                 ),
+            },
+            new()
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "👨‍⚖️ Разжаловать",
+                    callbackData: DemoteAdminCallbackData
+                )
+            },
+            new()
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "📝 Изменить имя",
+                    callbackData: EditUserNameCallbackData
+                ),
+            },
+            new()
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "💼 Изменить должность",
+                    callbackData: EditUserPositionCallbackData
+                ),
+            },
+            new()
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "⛔ Заблокировать",
+                    callbackData: BlockUserCallbackData
+                )
             },
             new()
             {

@@ -150,6 +150,32 @@ public class MessageCommandFactory : IMessageCommandFactory
             };
         }
         
+        // Если бот ожидает ввода нового имени пользователя
+        if (user.State == State.AwaitingNameForEdit)
+        {
+            // Возвращаем команду для изменения имени пользователя
+            return new EditUserNameCommand
+            {
+                ChatId = message.Chat,
+                TelegramUserId = message.From!.Id,
+                User = user,
+                FullName = message.Text
+            };
+        }
+        
+        // Если бот ожидает ввода новой должности пользователя
+        if (user.State == State.AwaitingPositionForEdit)
+        {
+            // Возвращаем команду для изменения должности пользователя
+            return new EditUserPositionCommand
+            {
+                ChatId = message.Chat,
+                TelegramUserId = message.From!.Id,
+                User = user,
+                Position = message.Text
+            };
+        }
+        
         // Если бот ожидает ввода ID нового администратора
         if (user.State is State.AwaitingAdminIdForAdding or State.AwaitingTeleAdminIdForAdding &&
             message.Type == MessageType.UsersShared)
@@ -213,7 +239,7 @@ public class MessageCommandFactory : IMessageCommandFactory
         }
 
         // Если бот ожидает ввода ID пользователя для удаления
-        if (user.State == State.AwaitingUserIdForBlock && message.Type == MessageType.UsersShared)
+        if (user.State == State.AwaitingUserIdForBlocking && message.Type == MessageType.UsersShared)
         {
             // Получаем идентификатор пользователя
             var userId = message.UsersShared?.Users.FirstOrDefault()?.UserId;
@@ -231,6 +257,44 @@ public class MessageCommandFactory : IMessageCommandFactory
             };
         }
 
+        // Если бот ожидает ввода ID пользователя для изменения имени
+        if (user.State == State.AwaitingUserIdForEditName && message.Type == MessageType.UsersShared)
+        {
+            // Получаем идентификатор пользователя
+            var userId = message.UsersShared?.Users.FirstOrDefault()?.UserId;
+
+            // Если идентификатор не удалось получить - не выполняем команду
+            if (userId == null) return null;
+
+            // Возвращаем команду для изменения имени пользователя
+            return new StartEditUserNameCommand
+            {
+                ChatId = message.Chat,
+                TelegramUserId = message.From!.Id,
+                User = user,
+                UserId = userId.Value
+            };
+        }
+        
+        // Если бот ожидает ввода ID пользователя для изменения должности
+        if (user.State == State.AwaitingUserIdForEditPosition && message.Type == MessageType.UsersShared)
+        {
+            // Получаем идентификатор пользователя
+            var userId = message.UsersShared?.Users.FirstOrDefault()?.UserId;
+
+            // Если идентификатор не удалось получить - не выполняем команду
+            if (userId == null) return null;
+
+            // Возвращаем команду для изменения должности пользователя
+            return new StartEditUserPositionCommand
+            {
+                ChatId = message.Chat,
+                TelegramUserId = message.From!.Id,
+                User = user,
+                UserId = userId.Value
+            };
+        }
+        
         // Если бот ожидает ввода ID пользователя для удаления
         if (user.State == State.AwaitingWorkingChatIdForAdding && message.Type == MessageType.ChatShared)
         {

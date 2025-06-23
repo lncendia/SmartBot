@@ -63,10 +63,30 @@ public enum State
     /// <summary>
     /// Ожидает ввода идентификатора пользователя для удаления.
     /// </summary>
-    AwaitingUserIdForBlock,
+    AwaitingUserIdForBlocking,
     
     /// <summary>
     /// Ожидает ввода идентификатора пользователя для установки рабочего чата.
     /// </summary>
     AwaitingUserIdForSetWorkingChat,
+    
+    /// <summary>
+    /// Ожидает ввода идентификатора пользователя для смены имени.
+    /// </summary>
+    AwaitingUserIdForEditName,
+    
+    /// <summary>
+    /// Ожидает ввода идентификатора пользователя для смены позиции.
+    /// </summary>
+    AwaitingUserIdForEditPosition,
+    
+    /// <summary>
+    /// Ожидает ввода имени пользователя для смены.
+    /// </summary>
+    AwaitingNameForEdit,
+    
+    /// <summary>
+    /// Ожидает ввода позиции пользователя для смены.
+    /// </summary>
+    AwaitingPositionForEdit
 }

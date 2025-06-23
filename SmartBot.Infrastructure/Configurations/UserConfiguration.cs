@@ -52,6 +52,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .WithMany() // У рабочего чата может быть много пользователей с временным выбором
             .HasForeignKey(u => u.SelectedWorkingChatId) // Внешний ключ в таблице User
             .OnDelete(DeleteBehavior.SetNull); // При удалении чата SelectedWorkingChatId станет null
+        
+        // Настраиваем связь many-to-one между User и временно выбранным User
+        builder.HasOne<User>() // У пользователя может быть только один временно выбранный пользователь
+            .WithMany() // У пользователя может быть много пользователей с временным выбором
+            .HasForeignKey(u => u.SelectedUserId) // Внешний ключ в таблице User
+            .OnDelete(DeleteBehavior.SetNull); // При удалении пользователя SelectedUserId станет null
 
         // Настраиваем owned-тип AnswerFor (ответ на сообщение)
         builder.OwnsOne(u => u.AnswerFor, answerBuilder =>
